@@ -131,8 +131,9 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
 .comment-item{display:flex;gap:12px;padding:14px 0;border-bottom:1px solid var(--line)}
 .comment-avatar{width:40px;height:40px;border-radius:6px;
   background:linear-gradient(180deg,#f8cfdd,#e39eb8);color:#fff;display:flex;align-items:center;justify-content:center;
-  font-size:16px;flex-shrink:0;border:1px solid rgba(178,58,99,.4);
+  font-size:16px;flex-shrink:0;border:1px solid rgba(178,58,99,.4);overflow:hidden;
   box-shadow:inset 0 1px 0 rgba(255,255,255,.5),0 1px 3px rgba(178,58,99,.25)}
+.comment-avatar img{width:100%;height:100%;object-fit:cover;display:block}
 .comment-body{flex:1;min-width:0}
 .comment-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px}
 .comment-name{font-size:14px;font-weight:600;color:var(--ink-600)}
@@ -216,6 +217,9 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
   <div class="nav-item" id="navAccount" onclick="switchView('account')">
     <span class="nav-ico">👤</span>账号管理
   </div>
+  <div class="nav-item" id="navAdmin" style="display:none" onclick="switchView('admin')">
+    <span class="nav-ico">⚙️</span>网站管理
+  </div>
 </div>
 <div class="wrap">
 
@@ -238,7 +242,7 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
     </div>
   </div>
 
-  <!-- 管理面板（站长/管理员可见） -->
+  <!-- 管理面板已迁到 viewAdmin 视图，这里不再内嵌 -->
   <div class="admin-panel" id="adminPanel" style="display:none">
     <h3 id="adminTitle">管理面板</h3>
     <div id="adminUserList"><div class="loading">加载中喵...</div></div>
@@ -287,8 +291,7 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
     <div class="card">
       <div class="acc-head">
         <div class="acc-avatar" id="accAvatarBox" onclick="document.getElementById('accAvatarInput').click()">
-          <img id="accAvatarImg" alt="头像" style="display:none">
-          <div class="no-avatar" id="accAvatarNo">喵</div>
+          <img id="accAvatarImg" alt="头像" src="assets/default-avatar.jpg">
         </div>
         <input type="file" id="accAvatarInput" accept="image/*" style="display:none" onchange="handleAvatar(event)">
         <h2 style="font-size:20px;color:var(--ink-600)">账号管理</h2>
@@ -321,6 +324,16 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
         <input id="accNewPass" type="password" placeholder="至少6位">
       </div>
       <button class="btn" style="width:100%" onclick="savePass()">更换密码</button>
+    </div>
+  </div>
+  <!-- ===== 网站管理视图（站长/管理员） ===== -->
+  <div class="view" id="viewAdmin">
+    <div class="card">
+      <!-- 管理面板（站长/管理员可见） -->
+      <div class="admin-panel" id="adminPanel" style="display:none">
+        <h3 id="adminTitle">管理面板</h3>
+        <div id="adminUserList"><div class="loading">加载中喵...</div></div>
+      </div>
     </div>
   </div>
 </div>
@@ -434,21 +447,38 @@ function switchView(name){
   document.getElementById('navMenu').classList.remove('show');
   const home = document.getElementById('viewHome');
   const acc = document.getElementById('viewAccount');
+  const admin = document.getElementById('viewAdmin');
   const navHome = document.getElementById('navHome');
   const navAcc = document.getElementById('navAccount');
+  const navAdmin = document.getElementById('navAdmin');
+  // 先全部隐藏
+  home.classList.remove('show');
+  acc.classList.remove('show');
+  if(admin) admin.classList.remove('show');
+  navHome.classList.remove('active');
+  navAcc.classList.remove('active');
+  if(navAdmin) navAdmin.classList.remove('active');
   if(name === 'home'){
     home.classList.add('show');
-    acc.classList.remove('show');
     navHome.classList.add('active');
-    navAcc.classList.remove('active');
     // 回到首页刷新评论
     if(typeof loadComments === 'function') loadComments(true);
   } else if(name === 'account'){
-    home.classList.remove('show');
     acc.classList.add('show');
-    navHome.classList.remove('active');
     navAcc.classList.add('active');
     loadAccountView();
+  } else if(name === 'admin'){
+    // 仅站长/管理员可进入该视图
+    if(currentProfile && ['owner','admin'].includes(currentProfile.role)){
+      admin.classList.add('show');
+      navAdmin.classList.add('active');
+      renderAdminPanel();
+    } else {
+      // 没权限：退回首页
+      home.classList.add('show');
+      navHome.classList.add('active');
+      alert('该页面仅限站长/管理员访问喵');
+    }
   }
 }
 // 点击导航区域外关闭菜单
@@ -461,31 +491,31 @@ document.addEventListener('click', function(e){
 });
 
 // ========== 账号管理视图 ==========
+const DEFAULT_AVATAR = 'assets/default-avatar.jpg';
 let accAvatarUrl = '';
 function loadAccountView(){
   const msg = document.getElementById('accMsg');
+  const accImg = document.getElementById('accAvatarImg');
   if(!currentUser){
     msg.className = 'acc-msg bad';
     msg.textContent = '请先登录后再管理账号喵';
     document.getElementById('accNick').value = '';
-    document.getElementById('accAvatarImg').style.display = 'none';
-    document.getElementById('accAvatarNo').style.display = 'flex';
+    // 未登录：显示默认头像
+    accImg.src = DEFAULT_AVATAR;
+    accAvatarUrl = '';
     return;
   }
   msg.className = 'acc-msg';
   msg.textContent = '';
   // 填充当前昵称
   document.getElementById('accNick').value = currentProfile ? (currentProfile.nickname || '') : '';
-  // 头像显示
+  // 头像显示：有上传用上传图，否则用默认头像
   if(currentProfile && currentProfile.avatar_url){
     accAvatarUrl = currentProfile.avatar_url;
-    document.getElementById('accAvatarImg').src = accAvatarUrl;
-    document.getElementById('accAvatarImg').style.display = 'block';
-    document.getElementById('accAvatarNo').style.display = 'none';
+    accImg.src = accAvatarUrl;
   } else {
     accAvatarUrl = '';
-    document.getElementById('accAvatarImg').style.display = 'none';
-    document.getElementById('accAvatarNo').style.display = 'flex';
+    accImg.src = DEFAULT_AVATAR;
   }
 }
 // 头像选择与压缩上传
@@ -498,12 +528,16 @@ function handleAvatar(event){
     const path = `avatars/${currentUser.id}/${Date.now()}.jpg`;
     try{
       const { error: upErr } = await supabaseClient.storage.from('avatars').upload(path, blob);
-      if(upErr){ alert('头像上传失败：' + zhErr(upErr.message)); return; }
+      if(upErr){
+        const zh = (upErr.message||'').toLowerCase().includes('bucket')
+          ? '头像存储桶不存在，请联系站长创建 avatars 桶喵'
+          : zhErr(upErr.message);
+        alert('头像上传失败：' + zh);
+        return;
+      }
       const { data: { publicUrl } } = supabaseClient.storage.from('avatars').getPublicUrl(path);
       accAvatarUrl = publicUrl;
       document.getElementById('accAvatarImg').src = accAvatarUrl;
-      document.getElementById('accAvatarImg').style.display = 'block';
-      document.getElementById('accAvatarNo').style.display = 'none';
       // 保存到资料
       const { error: up2 } = await supabaseClient.from('profiles').update({ avatar_url: accAvatarUrl }).eq('id', currentUser.id);
       if(up2){ alert('头像保存失败：' + zhErr(up2.message)); return; }
@@ -619,7 +653,15 @@ async function loadSession(){
       console.error('读取用户资料失败', e);
     }
     renderUserBar();
-    if(currentProfile && ['owner','admin'].includes(currentProfile.role)) renderAdminPanel();
+    // 已登录：根据角色决定是否显示「网站管理」菜单
+    const navAdmin = document.getElementById('navAdmin');
+    if(currentProfile && ['owner','admin'].includes(currentProfile.role)){
+      if(navAdmin) navAdmin.style.display = '';
+      // 预加载管理面板数据（不直接展示，等用户点菜单时再显示更自然）
+      renderAdminPanel();
+    } else {
+      if(navAdmin) navAdmin.style.display = 'none';
+    }
     // 已登录：解锁评论区
     setCommentLocked(false);
   } else {
@@ -723,7 +765,14 @@ async function doLogin(){
   currentProfile = prof;
   closeModal('loginModal');
   renderUserBar();
-  if(['owner','admin'].includes(currentProfile.role)) renderAdminPanel();
+  // 根据角色决定「网站管理」菜单的可见性
+  const navAdmin = document.getElementById('navAdmin');
+  if(currentProfile && ['owner','admin'].includes(currentProfile.role)){
+    if(navAdmin) navAdmin.style.display = '';
+    renderAdminPanel();
+  } else {
+    if(navAdmin) navAdmin.style.display = 'none';
+  }
   setCommentLocked(false); // 登录成功，解锁评论区
   await loadComments(true);
 }
@@ -735,6 +784,8 @@ async function doLogout(){
     `<button class="btn btn-ghost btn-small" onclick="showLogin()">登录</button>
      <button class="btn btn-small" onclick="showRegister()">注册</button>`;
   document.getElementById('adminPanel').style.display = 'none';
+  const navAdmin = document.getElementById('navAdmin');
+  if(navAdmin) navAdmin.style.display = 'none';
   document.getElementById('commentInput').placeholder = '登录后即可评论喵...';
   document.getElementById('commentInput').disabled = true;
   setCommentLocked(true); // 退出后重新上锁
@@ -859,10 +910,10 @@ function renderComment(c){
     currentUser.id === c.author_id
   );
   const delBtn = canDel ? `<button class="btn btn-bad btn-small" onclick="deleteComment('${c.id}')">删除</button>` : '';
-  const avatarChar = (author.nickname || author.username || '喵').charAt(0);
+  const avatarUrl = author.avatar_url || DEFAULT_AVATAR;
   return `
   <div class="comment-item">
-    <div class="comment-avatar">${escapeHtml(avatarChar)}</div>
+    <div class="comment-avatar"><img src="${escapeHtml(avatarUrl)}" alt="" loading="lazy" onerror="this.onerror=null;this.src='${DEFAULT_AVATAR}'"></div>
     <div class="comment-body">
       <div class="comment-meta">
         <span class="comment-name">${name}</span>${role}${uid}

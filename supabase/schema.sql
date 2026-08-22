@@ -241,3 +241,9 @@ create policy "auth insert comment_log" on public.comment_log
   for insert with check (auth.uid() = author_id);
 create policy "auth read own comment_log" on public.comment_log
   for select using (auth.uid() = author_id);
+
+-- ============================================================
+-- 12. Storage 桶（2026-08-22 追加）
+-- 头像桶 avatars、评论照片桶 comment-images
+-- 修复 Bucket not found 报错。完整版本见同目录 migrations/20260822120000_create_storage_buckets.sql
+-- ============================================================
