@@ -1,0 +1,41 @@
+# Supabase 项目配置 (91taffy.com)
+# 通过 GitHub 集成自动应用到生产数据库
+
+project_id = "91taffy"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+
+[db]
+port = 54322
+major_version = 15
+
+[studio]
+enabled = true
+port = 54323
+
+[auth]
+enabled = true
+site_url = "https://91taffy.com"
+additional_redirect_urls = ["https://91taffy.vercel.app"]
+jwt_expiry = 3600
+enable_signup = true
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = true
+
+# 评论照片存储桶（公开读，登录用户可上传）
+[storage.buckets.comment-images]
+public = true
+file_size_limit = "5MB"
+allowed_mime_types = ["image/jpeg", "image/png", "image/gif", "image/webp"]
+
+[storage.buckets.avatars]
+public = true
+file_size_limit = "2MB"
+allowed_mime_types = ["image/jpeg", "image/png", "image/webp"]
