@@ -3,171 +3,549 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>91塔菲站 · coming soon</title>
-<meta name="description" content="91taffy.com 塔菲的小窝，正在施工中喵">
+<title>91塔菲站 · 塔菲的小窝</title>
+<meta name="description" content="91taffy.com 塔菲的小窝喵">
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+:root{
+  --bg:#ffe3f0; --card:#ffffff; --ink-900:#4b1528; --ink-600:#993556;
+  --ink-400:#c48ba0; --pink-300:#f4c0d1; --pink-400:#d4537e; --pink-500:#b23a63;
+  --pink-600:#993556; --line:#f3d6e2; --ok:#0f6e56; --bad:#a32d2d;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{
+  font-family:"PingFang SC","Microsoft YaHei","幼圆",system-ui,sans-serif;
+  background:linear-gradient(160deg,#ffe3f0 0%,#ffc9dd 45%,#ffb3d1 100%);
+  min-height:100vh; color:var(--ink-900);
+}
+.wrap{max-width:860px;margin:0 auto;padding:20px 16px 60px}
+.card{background:rgba(255,255,255,.9);backdrop-filter:blur(10px);border-radius:24px;
+  border:2px solid rgba(255,255,255,.9);box-shadow:0 20px 60px rgba(212,83,126,.2);
+  padding:28px 26px;margin-bottom:20px}
+.hero{text-align:center;padding:32px 20px 24px}
+.paw{width:120px;height:120px;margin:0 auto 16px}
+.paw img{width:100%;height:100%;object-fit:contain}
+h1{font-size:36px;font-weight:800;letter-spacing:2px;
+  background:linear-gradient(135deg,#d4537e,#8e2d4f);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.tagline{margin-top:12px;font-size:14px;color:var(--pink-500)}
+.sub{margin-top:8px;font-size:13px;color:var(--ink-400)}
 
-  body {
-    font-family: "PingFang SC", "Microsoft YaHei", "幼圆", "Yuanti SC", "Segoe UI", system-ui, sans-serif;
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: linear-gradient(160deg, #ffe3f0 0%, #ffc9dd 45%, #ffb3d1 100%);
-    overflow: hidden;
-    color: #8e2d4f;
-  }
+/* 用户区 */
+.user-bar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px}
+.user-info{font-size:14px;color:var(--ink-600)}
+.uid-badge{display:inline-block;background:var(--pink-300);color:#fff;border-radius:12px;padding:1px 10px;font-size:12px;margin-left:6px}
+.role-badge{display:inline-block;border-radius:12px;padding:1px 10px;font-size:12px;color:#fff;margin-left:6px}
+.role-owner{background:#854f0b}.role-admin{background:#185fa5}.role-user{background:#888780}
 
-  .bubbles {
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    z-index: 0;
-  }
-  .bubble {
-    position: absolute;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.35);
-    animation: float 9s ease-in-out infinite;
-  }
-  @keyframes float {
-    0%, 100% { transform: translateY(0) scale(1); }
-    50% { transform: translateY(-24px) scale(1.05); }
-  }
+/* 按钮 */
+.btn{border:none;border-radius:14px;padding:9px 20px;font-size:14px;cursor:pointer;
+  background:linear-gradient(135deg,#f2a4c3,#d4537e);color:#fff;transition:.2s}
+.btn:hover{filter:brightness(1.06)}
+.btn-ghost{background:transparent;color:var(--pink-600);border:1px solid var(--pink-300)}
+.btn-ghost:hover{background:var(--pink-300);color:#fff}
+.btn-small{padding:5px 12px;font-size:12px;border-radius:10px}
+.btn-ok{background:linear-gradient(135deg,#5dcaa5,#1d9e75)}
+.btn-bad{background:linear-gradient(135deg,#f09595,#a32d2d)}
 
-  .card {
-    position: relative;
-    z-index: 1;
-    text-align: center;
-    padding: 48px 56px;
-    max-width: 460px;
-    width: 90%;
-    background: rgba(255, 255, 255, 0.82);
-    backdrop-filter: blur(10px);
-    border-radius: 32px;
-    border: 2px solid rgba(255, 255, 255, 0.9);
-    box-shadow: 0 20px 60px rgba(212, 83, 126, 0.28);
-    animation: pop 0.6s ease;
-  }
-  @keyframes pop {
-    from { opacity: 0; transform: translateY(24px) scale(0.96); }
-    to { opacity: 1; transform: none; }
-  }
+/* 弹窗 */
+.modal-mask{position:fixed;inset:0;background:rgba(75,21,40,.4);display:none;align-items:center;justify-content:center;z-index:50}
+.modal-mask.show{display:flex}
+.modal{background:#fff;border-radius:20px;padding:26px 24px;width:92%;max-width:400px;max-height:90vh;overflow-y:auto}
+.modal h3{font-size:20px;color:var(--ink-600);margin-bottom:18px;text-align:center}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:13px;color:var(--ink-600);margin-bottom:6px}
+.field input,.field select{width:100%;padding:10px 14px;border:1px solid var(--pink-300);border-radius:12px;font-size:14px;outline:none;color:var(--ink-900)}
+.field input:focus,.field select:focus{border-color:var(--pink-400)}
+.auth-error{color:var(--bad);font-size:13px;min-height:18px;margin-bottom:8px;text-align:center}
+.auth-tip{font-size:12px;color:var(--ink-400);text-align:center;margin-top:12px}
+.auth-tip a{color:var(--pink-500);cursor:pointer;text-decoration:underline}
 
-  .paw {
-    width: 120px;
-    height: 120px;
-    margin: 0 auto 20px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
+/* 评论区 */
+.comments-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.comments-head h2{font-size:18px;color:var(--ink-600)}
+.comment-form{background:var(--pink-300);border-radius:16px;padding:14px;margin-bottom:18px}
+.comment-form textarea{width:100%;min-height:72px;border:none;border-radius:12px;padding:12px;font-size:14px;resize:vertical;outline:none;font-family:inherit;color:var(--ink-900)}
+.toolbar{display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap}
+.toolbar .btn{padding:6px 14px;font-size:13px}
+.photo-preview{position:relative;display:inline-block;margin-top:8px}
+.photo-preview img{max-width:160px;max-height:120px;border-radius:12px;border:2px solid #fff}
+.photo-preview .x{position:absolute;top:-8px;right:-8px;background:var(--bad);color:#fff;border:none;border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:12px}
 
-  .paw img {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-  }
+/* 表情面板 */
+.emoji-panel{display:none;flex-wrap:wrap;gap:8px;margin-top:10px;background:#fff;border-radius:14px;padding:12px}
+.emoji-panel.show{display:flex}
+.emoji-panel img{width:56px;height:56px;object-fit:contain;cursor:pointer;border-radius:10px;transition:.15s}
+.emoji-panel img:hover{transform:scale(1.12);background:var(--pink-300)}
 
-  h1 {
-    font-size: 42px;
-    font-weight: 800;
-    letter-spacing: 2px;
-    background: linear-gradient(135deg, #d4537e, #8e2d4f);
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-  }
+/* 评论列表 */
+.comment-item{display:flex;gap:12px;padding:14px 0;border-bottom:1px solid var(--line)}
+.comment-avatar{width:40px;height:40px;border-radius:50%;background:var(--pink-300);color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.comment-body{flex:1;min-width:0}
+.comment-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px}
+.comment-name{font-size:14px;font-weight:600;color:var(--ink-600)}
+.comment-uid{font-size:11px;color:var(--ink-400);background:var(--pink-300);border-radius:8px;padding:0 6px}
+.comment-time{font-size:11px;color:var(--ink-400)}
+.comment-content{font-size:14px;line-height:1.7;color:var(--ink-900);word-break:break-word}
+.comment-content .emoji{display:inline-block;width:22px;height:22px;vertical-align:-4px;margin:0 1px}
+.comment-img{margin-top:8px;max-width:100%;max-height:260px;border-radius:12px}
+.comment-actions{margin-top:6px}
+.comment-actions .btn-small{margin-right:6px}
 
-  .coming {
-    margin-top: 12px;
-    font-size: 20px;
-    font-weight: 600;
-    color: #b23a63;
-    letter-spacing: 1px;
-  }
-  .coming .dot {
-    display: inline-block;
-    animation: blink 1.4s infinite;
-  }
-  .coming .dot:nth-child(2) { animation-delay: 0.2s; }
-  .coming .dot:nth-child(3) { animation-delay: 0.4s; }
-  @keyframes blink {
-    0%, 100% { opacity: 0.15; }
-    50% { opacity: 1; }
-  }
-
-  .sub {
-    margin-top: 18px;
-    font-size: 14px;
-    color: #9c8790;
-    line-height: 1.8;
-  }
-  .sub b { color: #d4537e; }
-
-  .divider {
-    width: 56px;
-    height: 3px;
-    border-radius: 3px;
-    margin: 22px auto;
-    background: linear-gradient(90deg, #f2a4c3, #d4537e);
-  }
-
-  .tagline {
-    font-size: 13px;
-    color: #b23a63;
-    letter-spacing: 0.5px;
-  }
-
-  .footer {
-    position: fixed;
-    bottom: 18px;
-    left: 0;
-    right: 0;
-    text-align: center;
-    z-index: 1;
-    font-size: 12px;
-    color: rgba(142, 45, 79, 0.65);
-    letter-spacing: 1px;
-  }
-
-  @media (max-width: 480px) {
-    h1 { font-size: 32px; }
-    .card { padding: 36px 28px; }
-  }
+/* 管理面板 */
+.admin-panel{background:#fdf2f7;border-radius:16px;padding:16px;margin-bottom:18px;border:1px dashed var(--pink-400)}
+.admin-panel h3{font-size:16px;color:var(--ink-600);margin-bottom:12px}
+.user-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.user-row .u-name{font-weight:600;font-size:14px}
+.user-row .u-meta{font-size:12px;color:var(--ink-400)}
+.empty{text-align:center;color:var(--ink-400);font-size:13px;padding:20px 0}
+.loading{text-align:center;color:var(--pink-500);font-size:13px;padding:16px}
+.footer{text-align:center;font-size:12px;color:rgba(142,45,79,.65);padding:20px}
+@media(max-width:480px){h1{font-size:28px}.card{padding:20px 16px}}
 </style>
 </head>
 <body>
+<div class="wrap">
 
-  <div class="bubbles" id="bubbles"></div>
-
+  <!-- 顶部用户条 -->
   <div class="card">
-    <div class="paw"><img src="assets/badge.gif" alt="塔菲徽章"></div>
-    <h1>91塔菲站</h1>
-    <div class="coming">coming soon<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span></div>
-    <div class="divider"></div>
-    <p class="sub">塔菲正在从1885年的威尔士<br>开着时光机赶过来装修这个小窝喵<br>大家耐心等一等<b>，马上就好喵</b></p>
-    <div class="divider"></div>
-    <p class="tagline">关注永雏塔菲喵！关注永雏塔菲谢谢喵！</p>
+    <div class="user-bar">
+      <div class="user-info" id="userInfo">未登录</div>
+      <div id="userActions">
+        <button class="btn btn-ghost btn-small" onclick="showLogin()">登录</button>
+        <button class="btn btn-small" onclick="showRegister()">注册</button>
+      </div>
+    </div>
+    <div class="hero">
+      <div class="paw"><img src="assets/badge.gif" alt="塔菲徽章"></div>
+      <h1>91塔菲站</h1>
+      <div class="tagline">关注永雏塔菲喵！关注永雏塔菲谢谢喵！</div>
+      <p class="sub">塔菲从1885年的威尔士开着时光机来啦<br>在这里留下你的爪印吧喵</p>
+    </div>
+  </div>
+
+  <!-- 管理面板（站长/管理员可见） -->
+  <div class="admin-panel" id="adminPanel" style="display:none">
+    <h3 id="adminTitle">管理面板</h3>
+    <div id="adminUserList"><div class="loading">加载中喵...</div></div>
+  </div>
+
+  <!-- 评论区 -->
+  <div class="card">
+    <div class="comments-head">
+      <h2>评论区</h2>
+      <span id="commentCount" class="sub"></span>
+    </div>
+    <div class="comment-form" id="commentForm">
+      <textarea id="commentInput" placeholder="登录后即可评论喵..."></textarea>
+      <div class="toolbar">
+        <button class="btn btn-ghost btn-small" onclick="toggleEmoji()">表情</button>
+        <button class="btn btn-ghost btn-small" onclick="document.getElementById('photoInput').click()">照片</button>
+        <input type="file" id="photoInput" accept="image/*" style="display:none" onchange="handlePhoto(event)">
+        <span id="photoStatus" class="sub" style="margin-left:auto"></span>
+        <button class="btn btn-small" onclick="submitComment()">发表评论</button>
+      </div>
+      <div class="photo-preview" id="photoPreview" style="display:none">
+        <img id="previewImg" alt="照片预览">
+        <button class="x" onclick="removePhoto()">×</button>
+      </div>
+      <div class="emoji-panel" id="emojiPanel"></div>
+    </div>
+    <div id="commentList"><div class="loading">加载中喵...</div></div>
   </div>
 
   <div class="footer">© 2026 91taffy.com · 塔菲的小窝</div>
+</div>
 
+<!-- 登录弹窗 -->
+<div class="modal-mask" id="loginModal">
+  <div class="modal">
+    <h3>登录</h3>
+    <div class="auth-error" id="loginError"></div>
+    <div class="field"><label>邮箱</label><input id="loginEmail" type="email" placeholder="you@example.com"></div>
+    <div class="field"><label>密码</label><input id="loginPass" type="password" placeholder="密码"></div>
+    <button class="btn" style="width:100%" onclick="doLogin()">登录</button>
+    <div class="auth-tip">还没有账号？<a onclick="showRegister()">去注册</a></div>
+    <div class="auth-tip"><a onclick="closeModal('loginModal')">关闭</a></div>
+  </div>
+</div>
+
+<!-- 注册弹窗 -->
+<div class="modal-mask" id="regModal">
+  <div class="modal">
+    <h3>注册新账号</h3>
+    <div class="auth-error" id="regError"></div>
+    <div class="field"><label>邮箱</label><input id="regEmail" type="email" placeholder="you@example.com"></div>
+    <div class="field"><label>昵称</label><input id="regNick" placeholder="你的昵称"></div>
+    <div class="field"><label>密码</label><input id="regPass" type="password" placeholder="至少6位"></div>
+    <div class="field"><label>性别</label>
+      <select id="regGender">
+        <option value="保密">保密</option>
+        <option value="男">男</option>
+        <option value="女">女</option>
+      </select>
+    </div>
+    <button class="btn" style="width:100%" onclick="doRegister()">注册</button>
+    <div class="auth-tip">已有账号？<a onclick="showLogin()">去登录</a></div>
+    <div class="auth-tip"><a onclick="closeModal('regModal')">关闭</a></div>
+  </div>
+</div>
+
+<!-- Supabase JS -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-  var wrap = document.getElementById('bubbles');
-  for (var i = 0; i < 16; i++) {
-    var b = document.createElement('span');
-    b.className = 'bubble';
-    var s = 18 + Math.random() * 46;
-    b.style.width = s + 'px';
-    b.style.height = s + 'px';
-    b.style.left = Math.random() * 100 + '%';
-    b.style.top = Math.random() * 100 + '%';
-    b.style.animationDelay = (Math.random() * 6) + 's';
-    b.style.animationDuration = (7 + Math.random() * 6) + 's';
-    wrap.appendChild(b);
+// ========== 配置（需替换为雏草姬的 Supabase 项目） ==========
+const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ========== 页面标识（每页通用，改这个值即可换页） ==========
+const PAGE_ID = 'home';
+
+// ========== 塔菲表情包（16个动态GIF，B站QQ装扮表情） ==========
+// 注：以下为 QQ 装扮 16 个动态表情的完整清单，动图资源待补充
+// 当前先用已获取到的塔菲表情静态图占位，拿到动图后替换即可
+const EMOJIS = [
+  ['开派对咯','emojis/kaipaidui.gif'],['不敢想了','emojis/buganxiang.gif'],
+  ['呼呼喵','emojis/huhumiao.gif'],['哈哈哈','emojis/hahaha.gif'],
+  ['嗨','emojis/hi.gif'],['吹爆','emojis/chuibao.gif'],
+  ['吃惊','emojis/chijing.gif'],['晕','emojis/yun.gif'],
+  ['疑问','emojis/yiwen.gif'],['嘻嘻喵','emojis/xiximiao.gif'],
+  ['傻宝','emojis/shabao.gif'],['VTB舔狗','emojis/tiangou.gif'],
+  ['不可以涩涩','emojis/bukesese.gif'],['嗯','emojis/en.gif']
+];
+
+let currentUser = null;
+let currentProfile = null;
+let selectedPhotoFile = null;
+let currentPage = 1;
+const PAGE_SIZE = 20;
+
+// ========== 初始化 ==========
+async function init(){
+  renderEmojiPanel();
+  await loadSession();
+  await loadComments(true);
+}
+init();
+
+// ========== 表情面板 ==========
+function renderEmojiPanel(){
+  const panel = document.getElementById('emojiPanel');
+  panel.innerHTML = '';
+  EMOJIS.forEach(([name, path]) => {
+    const img = document.createElement('img');
+    img.src = path; img.alt = name; img.title = name;
+    img.onclick = () => insertEmoji(name, path);
+    panel.appendChild(img);
+  });
+}
+function toggleEmoji(){
+  document.getElementById('emojiPanel').classList.toggle('show');
+}
+function insertEmoji(name, path){
+  const ta = document.getElementById('commentInput');
+  const marker = `[em:${name}]`;
+  ta.value += marker;
+  toggleEmoji();
+}
+
+// ========== 会话与用户 ==========
+async function loadSession(){
+  const { data:{ user } } = await supabase.auth.getUser();
+  if(user){
+    currentUser = user;
+    const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+    currentProfile = data;
+    renderUserBar();
+    if(['owner','admin'].includes(currentProfile.role)) renderAdminPanel();
   }
+}
+function renderUserBar(){
+  const p = currentProfile;
+  const info = document.getElementById('userInfo');
+  const roleClass = p.role === 'owner' ? 'role-owner' : p.role === 'admin' ? 'role-admin' : 'role-user';
+  const roleText = p.role === 'owner' ? '站长' : p.role === 'admin' ? '管理员' : '用户';
+  info.innerHTML = `你好，<b>${escapeHtml(p.nickname || p.username)}</b> <span class="uid-badge">UID ${p.uid}</span> <span class="role-badge ${roleClass}">${roleText}</span>${p.gender ? ' · '+p.gender : ''}`;
+  document.getElementById('userActions').innerHTML =
+    `<button class="btn btn-ghost btn-small" onclick="doLogout()">退出</button>`;
+  const ta = document.getElementById('commentInput');
+  ta.placeholder = `以 ${escapeHtml(p.nickname || p.username)} 的身份评论喵...`;
+  ta.disabled = false;
+}
+
+// ========== 登录/注册 ==========
+function showLogin(){ clearErr(); document.getElementById('loginModal').classList.add('show'); }
+function showRegister(){ clearErr(); document.getElementById('regModal').classList.add('show'); }
+function closeModal(id){ document.getElementById(id).classList.remove('show'); }
+function clearErr(){
+  document.getElementById('loginError').textContent='';
+  document.getElementById('regError').textContent='';
+}
+function isTemporaryEmail(email){
+  const domain = email.split('@')[1] || '';
+  const blacklist = ['mailinator.com','guerrillamail.com','10minutemail.com','yopmail.com',
+    'maildrop.cc','trashmail.com','tempmail.com','sharklasers.com','getnada.com',
+    'dispostable.com','mailnesia.com','temp-mail.org','throwawaymail.com'];
+  return blacklist.includes(domain.toLowerCase());
+}
+async function doRegister(){
+  const email = document.getElementById('regEmail').value.trim();
+  const nick = document.getElementById('regNick').value.trim();
+  const pass = document.getElementById('regPass').value;
+  const gender = document.getElementById('regGender').value;
+  const err = document.getElementById('regError');
+  if(!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ err.textContent='请输入正确的邮箱'; return; }
+  if(isTemporaryEmail(email)){ err.textContent='该邮箱为临时邮箱，暂不支持注册喵'; return; }
+  if(!nick){ err.textContent='请输入昵称'; return; }
+  if(pass.length < 6){ err.textContent='密码至少6位'; return; }
+  const { data, error } = await supabase.auth.signUp({
+    email, password: pass,
+    options:{ data:{ username:nick, nickname:nick, gender } }
+  });
+  if(error){ err.textContent = error.message; return; }
+  if(data.user && data.user.identities && data.user.identities.length === 0){
+    err.textContent = '该邮箱已被注册，请直接登录喵';
+    return;
+  }
+  err.style.color = 'var(--ok)';
+  err.textContent = '注册成功！请到邮箱查收验证邮件，点击验证链接后即可登录喵';
+  setTimeout(()=>closeModal('regModal'), 3000);
+}
+async function doLogin(){
+  const email = document.getElementById('loginEmail').value.trim();
+  const pass = document.getElementById('loginPass').value;
+  const err = document.getElementById('loginError');
+  if(!email || !pass){ err.textContent='请输入邮箱和密码'; return; }
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password: pass });
+  if(error){
+    if(error.message.includes('Email not confirmed')) err.textContent='请先到邮箱点击验证链接喵';
+    else err.textContent = error.message;
+    return;
+  }
+  currentUser = data.user;
+  const { data: prof } = await supabase.from('profiles').select('*').eq('id', data.user.id).single();
+  if(prof && prof.status === 'banned'){
+    err.textContent = '该账号已被封禁喵';
+    await supabase.auth.signOut();
+    return;
+  }
+  currentProfile = prof;
+  closeModal('loginModal');
+  renderUserBar();
+  if(['owner','admin'].includes(currentProfile.role)) renderAdminPanel();
+  await loadComments(true);
+}
+async function doLogout(){
+  await supabase.auth.signOut();
+  currentUser = null; currentProfile = null;
+  document.getElementById('userInfo').textContent = '未登录';
+  document.getElementById('userActions').innerHTML =
+    `<button class="btn btn-ghost btn-small" onclick="showLogin()">登录</button>
+     <button class="btn btn-small" onclick="showRegister()">注册</button>`;
+  document.getElementById('adminPanel').style.display = 'none';
+  document.getElementById('commentInput').placeholder = '登录后即可评论喵...';
+  document.getElementById('commentInput').disabled = true;
+  await loadComments(true);
+}
+
+// ========== 照片压缩上传 ==========
+function handlePhoto(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  if(!file.type.startsWith('image/')){ alert('请选择图片文件喵'); return; }
+  compressImage(file).then(blob => {
+    selectedPhotoFile = new File([blob], 'comment.jpg', { type: 'image/jpeg' });
+    const url = URL.createObjectURL(selectedPhotoFile);
+    document.getElementById('previewImg').src = url;
+    document.getElementById('photoPreview').style.display = 'inline-block';
+    document.getElementById('photoStatus').textContent = `压缩后 ${(selectedPhotoFile.size/1024).toFixed(0)}KB`;
+  });
+}
+function compressImage(file){
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 1280;
+        let { width, height } = img;
+        if(width > MAX || height > MAX){
+          const ratio = Math.min(MAX/width, MAX/height);
+          width = Math.round(width * ratio);
+          height = Math.round(height * ratio);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width; canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.8);
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+function removePhoto(){
+  selectedPhotoFile = null;
+  document.getElementById('photoPreview').style.display = 'none';
+  document.getElementById('previewImg').src = '';
+  document.getElementById('photoStatus').textContent = '';
+  document.getElementById('photoInput').value = '';
+}
+
+// ========== 评论 ==========
+async function submitComment(){
+  if(!currentUser){ alert('请先登录喵'); return; }
+  const ta = document.getElementById('commentInput');
+  const text = ta.value.trim();
+  if(!text && !selectedPhotoFile){ alert('说点什么再发喵'); return; }
+  let imageUrl = '';
+  if(selectedPhotoFile){
+    const path = `comments/${currentUser.id}/${Date.now()}.jpg`;
+    const { error: upErr } = await supabase.storage.from('comment-images').upload(path, selectedPhotoFile);
+    if(upErr){ alert('照片上传失败：' + upErr.message); return; }
+    const { data: { publicUrl } } = supabase.storage.from('comment-images').getPublicUrl(path);
+    imageUrl = publicUrl;
+  }
+  // 转义内容中的表情标记
+  let content = text;
+  EMOJIS.forEach(([name]) => {
+    const marker = `[em:${name}]`;
+    const repl = `<img class="emoji" src="${EMOJIS.find(e=>e[0]===name)[1]}" alt="${name}">`;
+    content = content.split(marker).join(repl);
+  });
+  const { error } = await supabase.from('comments').insert({
+    page_id: PAGE_ID,
+    author_id: currentUser.id,
+    content,
+    image_url: imageUrl
+  });
+  if(error){ alert('评论失败：' + error.message); return; }
+  ta.value = '';
+  removePhoto();
+  await loadComments(true);
+}
+async function loadComments(reset){
+  if(reset){ currentPage = 1; }
+  const from = (currentPage-1)*PAGE_SIZE;
+  const to = from + PAGE_SIZE - 1;
+  const { data, error, count } = await supabase
+    .from('comments')
+    .select('*, author:profiles(id,nickname,username,uid,role)', { count:'exact' })
+    .eq('page_id', PAGE_ID)
+    .order('created_at', { ascending:false })
+    .range(from, to);
+  if(error){ document.getElementById('commentList').innerHTML = `<div class="empty">加载失败：${error.message}</div>`; return; }
+  document.getElementById('commentCount').textContent = count ? `共 ${count} 条` : '';
+  const list = document.getElementById('commentList');
+  if(!data || data.length === 0){
+    list.innerHTML = `<div class="empty">还没有评论，快来抢沙发喵~</div>`;
+    return;
+  }
+  list.innerHTML = data.map(c => renderComment(c)).join('');
+  if(count > currentPage * PAGE_SIZE){
+    list.insertAdjacentHTML('beforeend',
+      `<div style="text-align:center;margin-top:10px"><button class="btn btn-ghost btn-small" onclick="loadComments(false)">加载更多</button></div>`);
+  }
+}
+function renderComment(c){
+  const author = c.author || {};
+  const name = escapeHtml(author.nickname || author.username || '神秘用户');
+  const uid = author.uid ? `<span class="comment-uid">UID ${author.uid}</span>` : '';
+  const role = author.role === 'owner' ? '<span class="role-badge role-owner">站长</span>' :
+               author.role === 'admin' ? '<span class="role-badge role-admin">管理员</span>' : '';
+  const time = new Date(c.created_at).toLocaleString('zh-CN', { hour12:false });
+  const img = c.image_url ? `<div><img class="comment-img" src="${c.image_url}" alt="评论照片" onclick="window.open('${c.image_url}')"></div>` : '';
+  const canDel = currentUser && (
+    currentProfile.role === 'owner' ||
+    currentProfile.role === 'admin' ||
+    currentUser.id === c.author_id
+  );
+  const delBtn = canDel ? `<button class="btn btn-bad btn-small" onclick="deleteComment('${c.id}')">删除</button>` : '';
+  const avatarChar = (author.nickname || author.username || '喵').charAt(0);
+  return `
+  <div class="comment-item">
+    <div class="comment-avatar">${escapeHtml(avatarChar)}</div>
+    <div class="comment-body">
+      <div class="comment-meta">
+        <span class="comment-name">${name}</span>${role}${uid}
+        <span class="comment-time">${time}</span>
+      </div>
+      <div class="comment-content">${c.content || '<i style="color:#999">[图片评论]</i>'}</div>
+      ${img}
+      <div class="comment-actions">${delBtn}</div>
+    </div>
+  </div>`;
+}
+async function deleteComment(id){
+  if(!confirm('确定删除这条评论吗喵？')) return;
+  const { error } = await supabase.from('comments').delete().eq('id', id);
+  if(error){ alert('删除失败：' + error.message); return; }
+  await loadComments(true);
+}
+
+// ========== 管理面板（站长/管理员） ==========
+async function renderAdminPanel(){
+  const panel = document.getElementById('adminPanel');
+  panel.style.display = 'block';
+  const isOwner = currentProfile.role === 'owner';
+  document.getElementById('adminTitle').textContent = isOwner ? '管理面板（站长）' : '管理面板（管理员）';
+  const list = document.getElementById('adminUserList');
+  list.innerHTML = '<div class="loading">加载用户中喵...</div>';
+  const { data, error } = await supabase.from('profiles')
+    .select('id,uid,nickname,username,email,gender,role,status,created_at')
+    .order('uid', { ascending:true });
+  if(error){ list.innerHTML = `<div class="empty">加载失败：${error.message}</div>`; return; }
+  list.innerHTML = data.map(u => {
+    const roleText = u.role==='owner'?'站长':u.role==='admin'?'管理员':'用户';
+    const statusText = u.status==='active'?'正常':'已封禁';
+    let btns = '';
+    if(isOwner && u.role !== 'owner'){
+      if(u.role === 'admin'){
+        btns += `<button class="btn btn-ghost btn-small" onclick="setRole('${u.id}','user')">取消管理员</button>`;
+      } else {
+        btns += `<button class="btn btn-ok btn-small" onclick="setRole('${u.id}','admin')">任命管理员</button>`;
+      }
+      if(u.status === 'active'){
+        btns += `<button class="btn btn-bad btn-small" onclick="setStatus('${u.id}','banned')">封禁</button>`;
+      } else {
+        btns += `<button class="btn btn-ok btn-small" onclick="setStatus('${u.id}','active')">解封</button>`;
+      }
+    } else if(!isOwner && u.role === 'user'){
+      if(u.status === 'active'){
+        btns += `<button class="btn btn-bad btn-small" onclick="setStatus('${u.id}','banned')">封禁</button>`;
+      } else {
+        btns += `<button class="btn btn-ok btn-small" onclick="setStatus('${u.id}','active')">解封</button>`;
+      }
+    }
+    return `<div class="user-row">
+      <span class="u-name">${escapeHtml(u.nickname||u.username)}</span>
+      <span class="uid-badge">UID ${u.uid}</span>
+      <span class="role-badge ${u.role==='owner'?'role-owner':u.role==='admin'?'role-admin':'role-user'}">${roleText}</span>
+      <span class="u-meta">${u.status==='banned'?'<b style="color:var(--bad)">已封禁</b>':statusText}${u.email?(' · '+u.email):''} · ${new Date(u.created_at).toLocaleDateString('zh-CN')}</span>
+      ${btns}
+    </div>`;
+  }).join('');
+}
+async function setRole(userId, role){
+  if(!confirm('确定要' + (role==='admin'?'任命为管理员':'取消管理员') + '吗喵？')) return;
+  const { error } = await supabase.from('profiles').update({ role }).eq('id', userId);
+  if(error){ alert('操作失败：' + error.message); return; }
+  renderAdminPanel();
+}
+async function setStatus(userId, status){
+  if(!confirm('确定要' + (status==='banned'?'封禁':'解封') + '该用户吗喵？')) return;
+  const { error } = await supabase.from('profiles').update({ status }).eq('id', userId);
+  if(error){ alert('操作失败：' + error.message); return; }
+  renderAdminPanel();
+}
+
+// ========== 工具函数 ==========
+function escapeHtml(s){
+  if(!s) return '';
+  return String(s).replace(/[&<>"']/g, c => (
+    {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]
+  ));
+}
 </script>
 </body>
 </html>
