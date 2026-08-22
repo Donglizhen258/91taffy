@@ -260,13 +260,13 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
 </div>
 
 <!-- Supabase JS（本地化，避免第三方CDN被网络环境拦截导致脚本失效） -->
-<script src="assets/vendor/supabase.js"></script>
+<script src="assets/vendor/supabaseClient.js"></script>
 <script>
 // ========== 配置（雏草姬的 Supabase 项目） ==========
-const SUPABASE_URL = 'https://gxdmrwlttvwyzqusmgzz.supabase.co';
+const SUPABASE_URL = 'https://gxdmrwlttvwyzqusmgzz.supabaseClient.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_VsIt-R_HLUct_YXMHkr6jg_YQWAnjpQ';
-// 兜底：即使 supabase.js 加载失败也不让页面脚本崩溃，登录/注册弹窗按钮照常可点
-const supabase = (window.supabase && window.supabase.createClient)
+// 兜底：即使 supabaseClient.js 加载失败也不让页面脚本崩溃，登录/注册弹窗按钮照常可点
+const supabaseClient = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
   : null;
 
@@ -346,7 +346,7 @@ function insertEmoji(name, path){
 async function loadSession(){
   let user = null;
   try{
-    const r = await supabase.auth.getUser();
+    const r = await supabaseClient.auth.getUser();
     user = r.data && r.data.user;
   }catch(e){
     console.error('supabase 未就绪', e);
@@ -354,7 +354,7 @@ async function loadSession(){
   if(user){
     currentUser = user;
     try{
-      const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+      const { data } = await supabaseClient.from('profiles').select('*').eq('id', user.id).single();
       currentProfile = data;
     }catch(e){
       console.error('读取用户资料失败', e);
@@ -407,7 +407,7 @@ async function doRegister(){
   if(!nick){ err.textContent='请输入昵称'; return; }
   if(pass.length < 6){ err.textContent='密码至少6位'; return; }
   if(!supabase){ err.textContent='服务暂不可用，请稍后重试喵'; return; }
-  const { data, error } = await supabase.auth.signUp({
+  const { data, error } = await supabaseClient.auth.signUp({
     email, password: pass,
     options:{ data:{ username:nick, nickname:nick, gender } }
   });
@@ -426,17 +426,17 @@ async function doLogin(){
   const err = document.getElementById('loginError');
   if(!email || !pass){ err.textContent='请输入邮箱和密码'; return; }
   if(!supabase){ err.textContent='服务暂不可用，请稍后重试喵'; return; }
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password: pass });
+  const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password: pass });
   if(error){
     if(error.message.includes('Email not confirmed')) err.textContent='请先到邮箱点击验证链接喵';
     else err.textContent = error.message;
     return;
   }
   currentUser = data.user;
-  const { data: prof } = await supabase.from('profiles').select('*').eq('id', data.user.id).single();
+  const { data: prof } = await supabaseClient.from('profiles').select('*').eq('id', data.user.id).single();
   if(prof && prof.status === 'banned'){
     err.textContent = '该账号已被封禁喵';
-    await supabase.auth.signOut();
+    await supabaseClient.auth.signOut();
     return;
   }
   currentProfile = prof;
@@ -447,7 +447,7 @@ async function doLogin(){
   await loadComments(true);
 }
 async function doLogout(){
-  try{ await supabase.auth.signOut(); }catch(e){ console.error(e); }
+  try{ await supabaseClient.auth.signOut(); }catch(e){ console.error(e); }
   currentUser = null; currentProfile = null;
   document.getElementById('userInfo').textContent = '未登录';
   document.getElementById('userActions').innerHTML =
@@ -514,9 +514,9 @@ async function submitComment(){
   let imageUrl = '';
   if(selectedPhotoFile){
     const path = `comments/${currentUser.id}/${Date.now()}.jpg`;
-    const { error: upErr } = await supabase.storage.from('comment-images').upload(path, selectedPhotoFile);
+    const { error: upErr } = await supabaseClient.storage.from('comment-images').upload(path, selectedPhotoFile);
     if(upErr){ alert('照片上传失败：' + upErr.message); return; }
-    const { data: { publicUrl } } = supabase.storage.from('comment-images').getPublicUrl(path);
+    const { data: { publicUrl } } = supabaseClient.storage.from('comment-images').getPublicUrl(path);
     imageUrl = publicUrl;
   }
   // 转义内容中的表情标记
@@ -526,7 +526,7 @@ async function submitComment(){
     const repl = `<img class="emoji" src="${EMOJIS.find(e=>e[0]===name)[1]}" alt="${name}">`;
     content = content.split(marker).join(repl);
   });
-  const { error } = await supabase.from('comments').insert({
+  const { error } = await supabaseClient.from('comments').insert({
     page_id: PAGE_ID,
     author_id: currentUser.id,
     content,
@@ -595,7 +595,7 @@ function renderComment(c){
 }
 async function deleteComment(id){
   if(!confirm('确定删除这条评论吗喵？')) return;
-  const { error } = await supabase.from('comments').delete().eq('id', id);
+  const { error } = await supabaseClient.from('comments').delete().eq('id', id);
   if(error){ alert('删除失败：' + error.message); return; }
   await loadComments(true);
 }
@@ -608,7 +608,7 @@ async function renderAdminPanel(){
   document.getElementById('adminTitle').textContent = isOwner ? '管理面板（站长）' : '管理面板（管理员）';
   const list = document.getElementById('adminUserList');
   list.innerHTML = '<div class="loading">加载用户中喵...</div>';
-  const { data, error } = await supabase.from('profiles')
+  const { data, error } = await supabaseClient.from('profiles')
     .select('id,uid,nickname,username,email,gender,role,status,created_at')
     .order('uid', { ascending:true });
   if(error){ list.innerHTML = `<div class="empty">加载失败：${error.message}</div>`; return; }
@@ -645,13 +645,13 @@ async function renderAdminPanel(){
 }
 async function setRole(userId, role){
   if(!confirm('确定要' + (role==='admin'?'任命为管理员':'取消管理员') + '吗喵？')) return;
-  const { error } = await supabase.from('profiles').update({ role }).eq('id', userId);
+  const { error } = await supabaseClient.from('profiles').update({ role }).eq('id', userId);
   if(error){ alert('操作失败：' + error.message); return; }
   renderAdminPanel();
 }
 async function setStatus(userId, status){
   if(!confirm('确定要' + (status==='banned'?'封禁':'解封') + '该用户吗喵？')) return;
-  const { error } = await supabase.from('profiles').update({ status }).eq('id', userId);
+  const { error } = await supabaseClient.from('profiles').update({ status }).eq('id', userId);
   if(error){ alert('操作失败：' + error.message); return; }
   renderAdminPanel();
 }
