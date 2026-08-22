@@ -294,6 +294,25 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
 .acc-msg.ok{color:var(--ok)}.acc-msg.bad{color:var(--bad)}
 .acc-divider{border:none;border-top:1px solid var(--line);margin:22px 0}
 .acc-hint{text-align:center;font-size:13px;color:var(--ink-400);padding:40px 0}
+
+/* 头像裁剪弹窗 */
+.modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.modal-head b{font-size:17px;color:var(--ink-600)}
+.modal-close{cursor:pointer;font-size:22px;line-height:1;color:var(--ink-400);padding:0 4px}
+.modal-close:hover{color:var(--bad)}
+.crop-tip{font-size:12px;color:var(--ink-400);margin-bottom:10px}
+.crop-box{
+  position:relative;width:100%;height:280px;overflow:hidden;border-radius:6px;cursor:move;
+  background:repeating-conic-gradient(#f3e3ea 0% 25%,#fff 0% 50%) 50%/20px 20px;
+  border:1px solid rgba(178,58,99,.4);touch-action:none}
+.crop-box img{position:absolute;left:0;top:0;user-select:none;-webkit-user-drag:none;pointer-events:none;will-change:transform}
+.crop-mask{position:absolute;inset:0;pointer-events:none;display:flex;align-items:center;justify-content:center}
+.crop-mask::before{
+  content:'';width:min(100%,280px);aspect-ratio:1;
+  box-shadow:0 0 0 9999px rgba(20,10,15,.55);
+  outline:1.5px solid rgba(255,255,255,.85);outline-offset:-1px}
+.crop-zoombar{display:flex;justify-content:center;gap:10px;margin:12px 0 4px}
+.crop-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:8px}
 </style>
 </head>
 <body>
@@ -452,6 +471,30 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
         <input id="accNewPass" type="password" placeholder="至少6位">
       </div>
       <button class="btn" style="width:100%" onclick="savePass()">更换密码</button>
+    </div>
+  </div>
+  <!-- ===== 头像裁剪弹窗 ===== -->
+  <div class="modal-mask" id="cropModal">
+    <div class="modal" style="max-width:420px">
+      <div class="modal-head">
+        <b>裁剪头像</b>
+        <span class="modal-close" onclick="closeCropModal()">×</span>
+      </div>
+      <div class="crop-tip">拖动图片调整位置，滚轮或按钮缩放，选好方形区域后点「确定」喵</div>
+      <div class="crop-box" id="cropBox"
+        onmousedown="startCropDrag(event)"
+        onwheel="onCropWheel(event)">
+        <img id="cropImg" alt="裁剪预览" style="position:absolute;left:0;top:0;user-select:none;-webkit-user-drag:none;pointer-events:none">
+        <div class="crop-mask"></div>
+      </div>
+      <div class="crop-zoombar">
+        <button class="btn btn-ghost btn-small" onclick="cropZoom(0.8)">−</button>
+        <button class="btn btn-ghost btn-small" onclick="cropZoom(1.25)">＋</button>
+      </div>
+      <div class="crop-actions">
+        <button class="btn btn-ghost" onclick="closeCropModal()">取消</button>
+        <button class="btn" onclick="confirmCrop()">确定</button>
+      </div>
     </div>
   </div>
   <!-- ===== 网站管理视图（站长/管理员） ===== -->
@@ -778,40 +821,154 @@ function loadAccountView(){
     accImg.src = DEFAULT_AVATAR;
   }
 }
-// 头像选择与压缩上传
+// 头像选择与裁剪上传
 function handleAvatar(event){
   if(!currentUser){ alert('请先登录喵'); return; }
   const file = event.target.files[0];
   if(!file) return;
   if(!file.type.startsWith('image/')){ alert('请选择图片文件喵'); return; }
-  compressImage(file).then(async (blob) => {
-    const path = `avatars/${currentUser.id}/${Date.now()}.jpg`;
-    try{
-      const { error: upErr } = await supabaseClient.storage.from('avatars').upload(path, blob);
-      if(upErr){
-        const zh = (upErr.message||'').toLowerCase().includes('bucket')
-          ? '头像存储桶不存在，请联系站长创建 avatars 桶喵'
-          : zhErr(upErr.message);
-        alert('头像上传失败：' + zh);
-        return;
-      }
-      const { data: { publicUrl } } = supabaseClient.storage.from('avatars').getPublicUrl(path);
-      accAvatarUrl = publicUrl;
-      document.getElementById('accAvatarImg').src = accAvatarUrl;
-      // 保存到资料
-      const { error: up2 } = await supabaseClient.from('profiles').update({ avatar_url: accAvatarUrl }).eq('id', currentUser.id);
-      if(up2){ alert('头像保存失败：' + zhErr(up2.message)); return; }
-      if(currentProfile) currentProfile.avatar_url = accAvatarUrl;
-      showAccMsg('头像已更新喵', true);
-    }catch(e){
-      alert('头像上传异常：' + e.message);
-    }
-  });
+  openCropModal(file);
 }
 function showAccMsg(text, ok){
   const msg = document.getElementById('accMsg');
   msg.className = 'acc-msg ' + (ok ? 'ok' : 'bad');
   msg.textContent = text;
+}
+
+// ========== 头像裁剪弹窗（方形选框，可拖动/缩放） ==========
+let cropState = null; // { img, scale, offX, offY, containerW, containerH, fitW, fitH, baseScale }
+function openCropModal(file){
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      cropState = {
+        img, scale: 1, offX: 0, offY: 0,
+        fitW: 0, fitH: 0, baseScale: 1,
+        naturalW: img.naturalWidth, naturalH: img.naturalHeight
+      };
+      document.getElementById('cropImg').src = e.target.result;
+      document.getElementById('cropModal').classList.add('show');
+      requestAnimationFrame(() => { initCrop(); renderCrop(); });
+    };
+    img.onerror = () => alert('图片读取失败喵');
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+function closeCropModal(){
+  document.getElementById('cropModal').classList.remove('show');
+  cropState = null;
+  document.getElementById('accAvatarInput').value = '';
+}
+function initCrop(){
+  const wrap = document.getElementById('cropBox');
+  const rect = wrap.getBoundingClientRect();
+  const W = rect.width, H = rect.height;
+  cropState.containerW = W; cropState.containerH = H;
+  const iw = cropState.naturalW, ih = cropState.naturalH;
+  const side = Math.min(W, H);
+  const base = Math.max(side / iw, side / ih); // cover 铺满
+  cropState.baseScale = base;
+  cropState.scale = 1;
+  cropState.offX = (W - iw * base) / 2;
+  cropState.offY = (H - ih * base) / 2;
+  renderCrop();
+}
+function renderCrop(){
+  const s = cropState; if(!s) return;
+  const img = document.getElementById('cropImg');
+  const total = s.baseScale * s.scale;
+  img.style.width = (s.naturalW * total) + 'px';
+  img.style.height = (s.naturalH * total) + 'px';
+  img.style.transform = `translate(${s.offX}px,${s.offY}px)`;
+  img.style.left = '0'; img.style.top = '0';
+}
+// 拖动图片
+let cropDrag = null;
+function startCropDrag(e){
+  if(!cropState) return;
+  e.preventDefault();
+  cropDrag = { startX: e.clientX, startY: e.clientY, offX: cropState.offX, offY: cropState.offY };
+  document.addEventListener('mousemove', onCropDrag);
+  document.addEventListener('mouseup', endCropDrag);
+}
+function onCropDrag(e){
+  if(!cropDrag || !cropState) return;
+  cropState.offX = cropDrag.offX + (e.clientX - cropDrag.startX);
+  cropState.offY = cropDrag.offY + (e.clientY - cropDrag.startY);
+  renderCrop();
+}
+function endCropDrag(){
+  cropDrag = null;
+  document.removeEventListener('mousemove', onCropDrag);
+  document.removeEventListener('mouseup', endCropDrag);
+}
+// 缩放（保持图片中心不动）
+function cropZoom(delta){
+  if(!cropState) return;
+  const ns = Math.min(5, Math.max(0.2, cropState.scale * delta));
+  const ratio = ns / cropState.scale;
+  const w = cropState.naturalW * cropState.baseScale * cropState.scale;
+  const h = cropState.naturalH * cropState.baseScale * cropState.scale;
+  const cx = cropState.offX + w / 2;
+  const cy = cropState.offY + h / 2;
+  cropState.scale = ns;
+  cropState.offX = cx - (w * ratio) / 2;
+  cropState.offY = cy - (h * ratio) / 2;
+  renderCrop();
+}
+function onCropWheel(e){
+  if(!cropState) return;
+  e.preventDefault();
+  cropZoom(e.deltaY < 0 ? 1.1 : 0.9);
+}
+// 确认裁剪：按方形选框截取并上传
+function confirmCrop(){
+  const s = cropState; if(!s || !currentUser) return;
+  const side = Math.min(s.containerW, s.containerH);
+  const total = s.baseScale * s.scale;
+  const boxLeft = (s.containerW - side) / 2;
+  const boxTop = (s.containerH - side) / 2;
+  const imgX = (boxLeft - s.offX) / total;
+  const imgY = (boxTop - s.offY) / total;
+  const cropW = side / total;
+  const cropH = side / total;
+  const OUT = 320; // 输出方形头像 320x320
+  const canvas = document.createElement('canvas');
+  canvas.width = OUT; canvas.height = OUT;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(s.img, imgX, imgY, cropW, cropH, 0, 0, OUT, OUT);
+  canvas.toBlob(async (blob) => {
+    if(!blob){ alert('裁剪失败喵'); return; }
+    await uploadAvatarBlob(blob);
+  }, 'image/jpeg', 0.88);
+}
+// 上传裁剪结果
+async function uploadAvatarBlob(blob){
+  const path = `avatars/${currentUser.id}/${Date.now()}.jpg`;
+  try{
+    const { error: upErr } = await supabaseClient.storage.from('avatars').upload(path, blob, { contentType: 'image/jpeg', upsert: true });
+    if(upErr){
+      const zh = (upErr.message||'').toLowerCase().includes('bucket')
+        ? '头像存储桶不存在，请先让站长在 Supabase 控制台执行建桶 SQL 创建 avatars 桶喵'
+        : zhErr(upErr.message);
+      alert('头像上传失败：' + zh);
+      closeCropModal();
+      return;
+    }
+    const { data: { publicUrl } } = supabaseClient.storage.from('avatars').getPublicUrl(path);
+    accAvatarUrl = publicUrl;
+    document.getElementById('accAvatarImg').src = accAvatarUrl;
+    const { error: up2 } = await supabaseClient.from('profiles').update({ avatar_url: accAvatarUrl }).eq('id', currentUser.id);
+    if(up2){ alert('头像保存失败：' + zhErr(up2.message)); closeCropModal(); return; }
+    if(currentProfile) currentProfile.avatar_url = accAvatarUrl;
+    closeCropModal();
+    showAccMsg('头像已更新喵', true);
+  }catch(e){
+    alert('头像上传异常：' + e.message);
+    closeCropModal();
+  }
 }
 async function saveNick(){
   if(!currentUser){ alert('请先登录喵'); return; }
