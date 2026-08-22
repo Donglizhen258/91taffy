@@ -407,14 +407,14 @@ const PAGE_ID = 'home';
 // 来源：https://www.bilibili.com/read/cv24502948（永雏塔菲QQ装扮高清动态表情包）
 // 命名：沿用塔菲装扮表情官方名（NO喵!/不理你了/.../生日快乐）
 const EMOJIS = [
-  ['NO喵!','assets/emojis/no.gif'],['不理你了','assets/emojis/buli.gif'],
-  ['嘲笑','assets/emojis/chaoxiao.gif'],['喵喵拳','assets/emojis/miaomiaoquan.gif'],
-  ['对呀对呀','assets/emojis/duiya.gif'],['尴尬','assets/emojis/ganga.gif'],
-  ['哈哈哈','assets/emojis/hahaha.gif'],['好热','assets/emojis/haore.gif'],
-  ['呼呼喵','assets/emojis/huhumiao.gif'],['开派对咯','assets/emojis/kaipaidui.gif'],
-  ['累','assets/emojis/lei.gif'],['令人兴奋','assets/emojis/xingfen.gif'],
-  ['摸头','assets/emojis/motou.gif'],['亲嘴','assets/emojis/qinzui.gif'],
-  ['闪亮登场','assets/emojis/shanliang.gif'],['生日快乐','assets/emojis/shengri.gif']
+  ['害羞','assets/emojis/no.gif'],['困了','assets/emojis/buli.gif'],
+  ['打雷拳','assets/emojis/chaoxiao.gif'],['好滴','assets/emojis/duiya.gif'],
+  ['羞羞','assets/emojis/ganga.gif'],['干杯','assets/emojis/hahaha.gif'],
+  ['问好','assets/emojis/haore.gif'],['生气','assets/emojis/huhumiao.gif'],
+  ['开森','assets/emojis/kaipaidui.gif'],['说','assets/emojis/lei.gif'],
+  ['呆','assets/emojis/miaomiaoquan.gif'],['比耶','assets/emojis/motou.gif'],
+  ['偷笑','assets/emojis/qinzui.gif'],['哈哈','assets/emojis/shanliang.gif'],
+  ['卖萌','assets/emojis/shengri.gif'],['嗨','assets/emojis/xingfen.gif']
 ];
 
 let currentUser = null;
@@ -603,7 +603,7 @@ async function savePass(){
 }
 
 async function init(){
-  renderEmojiPanel();
+  // 表情面板改为懒加载：首次点「表情」按钮时才渲染，避免页面加载时预载 16 个 GIF
   // 先上锁，等会话状态出来再解锁
   setCommentLocked(true);
   try{
@@ -616,17 +616,23 @@ async function init(){
 init();
 
 // ========== 表情面板 ==========
+let emojiPanelRendered = false;
 function renderEmojiPanel(){
+  if(emojiPanelRendered) return;
+  emojiPanelRendered = true;
   const panel = document.getElementById('emojiPanel');
   panel.innerHTML = '';
   EMOJIS.forEach(([name, path]) => {
     const img = document.createElement('img');
     img.src = path; img.alt = name; img.title = name;
+    img.loading = 'lazy';
     img.onclick = () => insertEmoji(name, path);
     panel.appendChild(img);
   });
 }
 function toggleEmoji(){
+  // 首次展开时才渲染表情，避免页面加载即预载 16 个 GIF
+  renderEmojiPanel();
   document.getElementById('emojiPanel').classList.toggle('show');
 }
 function insertEmoji(name, path){
