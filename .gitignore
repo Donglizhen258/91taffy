@@ -1,0 +1,8 @@
+# 排除无关文件
+node_modules/
+.DS_Store
+*.log
+
+# 本地预览缓存
+__pycache__/
+*.pyc

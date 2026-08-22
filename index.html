@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>91塔菲站 · coming soon</title>
+<meta name="description" content="91taffy.com 塔菲的小窝，正在施工中喵">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", "幼圆", "Yuanti SC", "Segoe UI", system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(160deg, #ffe3f0 0%, #ffc9dd 45%, #ffb3d1 100%);
+    overflow: hidden;
+    color: #8e2d4f;
+  }
+
+  .bubbles {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .bubble {
+    position: absolute;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.35);
+    animation: float 9s ease-in-out infinite;
+  }
+  @keyframes float {
+    0%, 100% { transform: translateY(0) scale(1); }
+    50% { transform: translateY(-24px) scale(1.05); }
+  }
+
+  .card {
+    position: relative;
+    z-index: 1;
+    text-align: center;
+    padding: 48px 56px;
+    max-width: 460px;
+    width: 90%;
+    background: rgba(255, 255, 255, 0.82);
+    backdrop-filter: blur(10px);
+    border-radius: 32px;
+    border: 2px solid rgba(255, 255, 255, 0.9);
+    box-shadow: 0 20px 60px rgba(212, 83, 126, 0.28);
+    animation: pop 0.6s ease;
+  }
+  @keyframes pop {
+    from { opacity: 0; transform: translateY(24px) scale(0.96); }
+    to { opacity: 1; transform: none; }
+  }
+
+  .paw {
+    width: 120px;
+    height: 120px;
+    margin: 0 auto 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .paw img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+
+  h1 {
+    font-size: 42px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    background: linear-gradient(135deg, #d4537e, #8e2d4f);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .coming {
+    margin-top: 12px;
+    font-size: 20px;
+    font-weight: 600;
+    color: #b23a63;
+    letter-spacing: 1px;
+  }
+  .coming .dot {
+    display: inline-block;
+    animation: blink 1.4s infinite;
+  }
+  .coming .dot:nth-child(2) { animation-delay: 0.2s; }
+  .coming .dot:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes blink {
+    0%, 100% { opacity: 0.15; }
+    50% { opacity: 1; }
+  }
+
+  .sub {
+    margin-top: 18px;
+    font-size: 14px;
+    color: #9c8790;
+    line-height: 1.8;
+  }
+  .sub b { color: #d4537e; }
+
+  .divider {
+    width: 56px;
+    height: 3px;
+    border-radius: 3px;
+    margin: 22px auto;
+    background: linear-gradient(90deg, #f2a4c3, #d4537e);
+  }
+
+  .tagline {
+    font-size: 13px;
+    color: #b23a63;
+    letter-spacing: 0.5px;
+  }
+
+  .footer {
+    position: fixed;
+    bottom: 18px;
+    left: 0;
+    right: 0;
+    text-align: center;
+    z-index: 1;
+    font-size: 12px;
+    color: rgba(142, 45, 79, 0.65);
+    letter-spacing: 1px;
+  }
+
+  @media (max-width: 480px) {
+    h1 { font-size: 32px; }
+    .card { padding: 36px 28px; }
+  }
+</style>
+</head>
+<body>
+
+  <div class="bubbles" id="bubbles"></div>
+
+  <div class="card">
+    <div class="paw"><img src="assets/badge.gif" alt="塔菲徽章"></div>
+    <h1>91塔菲站</h1>
+    <div class="coming">coming soon<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span></div>
+    <div class="divider"></div>
+    <p class="sub">塔菲正在从1885年的威尔士<br>开着时光机赶过来装修这个小窝喵<br>大家耐心等一等<b>，马上就好喵</b></p>
+    <div class="divider"></div>
+    <p class="tagline">关注永雏塔菲喵！关注永雏塔菲谢谢喵！</p>
+  </div>
+
+  <div class="footer">© 2026 91taffy.com · 塔菲的小窝</div>
+
+<script>
+  var wrap = document.getElementById('bubbles');
+  for (var i = 0; i < 16; i++) {
+    var b = document.createElement('span');
+    b.className = 'bubble';
+    var s = 18 + Math.random() * 46;
+    b.style.width = s + 'px';
+    b.style.height = s + 'px';
+    b.style.left = Math.random() * 100 + '%';
+    b.style.top = Math.random() * 100 + '%';
+    b.style.animationDelay = (Math.random() * 6) + 's';
+    b.style.animationDuration = (7 + Math.random() * 6) + 's';
+    wrap.appendChild(b);
+  }
+</script>
+</body>
+</html>
