@@ -403,17 +403,18 @@ const supabaseClient = (window.supabase && window.supabase.createClient)
 // ========== 页面标识（每页通用，改这个值即可换页） ==========
 const PAGE_ID = 'home';
 
-// ========== 塔菲表情包（16个动态GIF，B站QQ装扮表情） ==========
-// 注：以下为 QQ 装扮 16 个动态表情的完整清单，动图资源待补充
-// 当前先用已获取到的塔菲表情静态图占位，拿到动图后替换即可
+// ========== 塔菲表情包（16个动态GIF，B站专栏 cv24502948 高清动态表情） ==========
+// 来源：https://www.bilibili.com/read/cv24502948（永雏塔菲QQ装扮高清动态表情包）
+// 命名：沿用塔菲装扮表情官方名（NO喵!/不理你了/.../生日快乐）
 const EMOJIS = [
-  ['开派对咯','emojis/kaipaidui.gif'],['不敢想了','emojis/buganxiang.gif'],
-  ['呼呼喵','emojis/huhumiao.gif'],['哈哈哈','emojis/hahaha.gif'],
-  ['嗨','emojis/hi.gif'],['吹爆','emojis/chuibao.gif'],
-  ['吃惊','emojis/chijing.gif'],['晕','emojis/yun.gif'],
-  ['疑问','emojis/yiwen.gif'],['嘻嘻喵','emojis/xiximiao.gif'],
-  ['傻宝','emojis/shabao.gif'],['VTB舔狗','emojis/tiangou.gif'],
-  ['不可以涩涩','emojis/bukesese.gif'],['嗯','emojis/en.gif']
+  ['NO喵!','emojis/no.gif'],['不理你了','emojis/buli.gif'],
+  ['嘲笑','emojis/chaoxiao.gif'],['喵喵拳','emojis/miaomiaoquan.gif'],
+  ['对呀对呀','emojis/duiya.gif'],['尴尬','emojis/ganga.gif'],
+  ['哈哈哈','emojis/hahaha.gif'],['好热','emojis/haore.gif'],
+  ['呼呼喵','emojis/huhumiao.gif'],['开派对咯','emojis/kaipaidui.gif'],
+  ['累','emojis/lei.gif'],['令人兴奋','emojis/xingfen.gif'],
+  ['摸头','emojis/motou.gif'],['亲嘴','emojis/qinzui.gif'],
+  ['闪亮登场','emojis/shanliang.gif'],['生日快乐','emojis/shengri.gif']
 ];
 
 let currentUser = null;
