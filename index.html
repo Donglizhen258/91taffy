@@ -1301,11 +1301,15 @@ async function doLogin(){
     let email = account.includes('@') ? account : null;
     let lookedUp = false;
     if(!email){
-      const { data: row } = await supabaseClient
-        .from('profiles')
-        .select('email')
-        .eq('username', account)
-        .maybeSingle();
+      const { data: row } = await withTimeout(
+        supabaseClient
+          .from('profiles')
+          .select('email')
+          .eq('username', account)
+          .maybeSingle(),
+        10000,
+        { data: null, error: { message: '__TIMEOUT__' } }
+      );
       if(row && row.email){ email = row.email; lookedUp = true; }
     }
     if(!email){
@@ -1325,27 +1329,47 @@ async function tryLogin(cred, btn, err, byAccount){
   }
   err.textContent = '';
   setAuthLoading(btn, true, '登录中…');
-  const { data, error } = await supabaseClient.auth.signInWithPassword(cred);
+  // 登录请求加 15 秒超时：网络/代理异常时不无限转圈卡死
+  const { data, error } = await withTimeout(
+    supabaseClient.auth.signInWithPassword(cred),
+    15000,
+    { data: null, error: { message: '__LOGIN_TIMEOUT__' } }
+  );
   if(error){
     setAuthLoading(btn, false);
-    err.textContent = zhErr(error.message);
+    err.textContent = (error.message === '__LOGIN_TIMEOUT__')
+      ? '登录超时，请检查网络或代理设置后重试喵'
+      : zhErr(error.message);
     return;
   }
   currentUser = data.user;
   let prof = null;
-  const { data: prof1 } = await supabaseClient.from('profiles').select('*').eq('id', data.user.id).maybeSingle();
+  // 读资料也加 10 秒超时，防止 profiles 查询挂起卡在登录后
+  const { data: prof1 } = await withTimeout(
+    supabaseClient.from('profiles').select('*').eq('id', data.user.id).maybeSingle(),
+    10000,
+    { data: null, error: { message: '__TIMEOUT__' } }
+  );
   prof = prof1;
   // 已登录但无 profiles（如验证后才建号、或触发器偶发未触发）：RPC 兜底补建再读一次
   if(!prof){
     try{
       const meta = data.user.user_metadata || {};
-      await supabaseClient.rpc('ensure_profile', {
-        p_id: data.user.id,
-        p_email: data.user.email || '',
-        p_username: meta.username || null,
-        p_nickname: meta.nickname || null
-      });
-      const { data: prof2 } = await supabaseClient.from('profiles').select('*').eq('id', data.user.id).maybeSingle();
+      await withTimeout(
+        supabaseClient.rpc('ensure_profile', {
+          p_id: data.user.id,
+          p_email: data.user.email || '',
+          p_username: meta.username || null,
+          p_nickname: meta.nickname || null
+        }),
+        10000,
+        { data: null, error: { message: '__TIMEOUT__' } }
+      );
+      const { data: prof2 } = await withTimeout(
+        supabaseClient.from('profiles').select('*').eq('id', data.user.id).maybeSingle(),
+        10000,
+        { data: null, error: { message: '__TIMEOUT__' } }
+      );
       prof = prof2;
     }catch(e){ /* 补建失败不阻断，下面按缺失处理 */ }
   }
