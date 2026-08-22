@@ -158,11 +158,69 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
 .loading{text-align:center;color:var(--pink-500);font-size:13px;padding:16px}
 .footer{text-align:center;font-size:12px;color:rgba(142,45,79,.65);padding:20px;text-shadow:0 1px 0 rgba(255,255,255,.5)}
 @media(max-width:480px){h1{font-size:30px}.card{padding:20px 16px}}
+
+/* ===== 左上角导航菜单（Win7 立体方框） ===== */
+.nav-btn{
+  position:fixed;top:14px;left:14px;z-index:60;width:44px;height:44px;cursor:pointer;
+  background:linear-gradient(180deg,#ffffff,#fdf0f5);border:1px solid rgba(178,58,99,.45);border-radius:6px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 1px 3px rgba(178,58,99,.3);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;transition:.12s}
+.nav-btn:hover{background:linear-gradient(180deg,#ffeaf2,#f8d5e2)}
+.nav-btn:active{box-shadow:inset 0 2px 4px rgba(0,0,0,.15)}
+.nav-btn .bar{width:20px;height:2px;background:linear-gradient(90deg,#d4537e,#b23a63);border-radius:1px}
+.nav-menu{
+  position:fixed;top:66px;left:14px;z-index:60;min-width:180px;display:none;
+  background:linear-gradient(180deg,#ffffff,#fff5f8);border:1px solid rgba(212,83,126,.4);border-radius:8px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 6px 20px rgba(178,58,99,.3);padding:6px}
+.nav-menu.show{display:block}
+.nav-item{
+  display:flex;align-items:center;gap:10px;padding:11px 14px;cursor:pointer;border-radius:4px;
+  font-size:14px;color:var(--ink-600);transition:.1s;border:1px solid transparent}
+.nav-item:hover{background:var(--pink-300);color:#fff}
+.nav-item.active{background:linear-gradient(180deg,#fdb1cc,#d4537e);color:#fff;font-weight:600;
+  border-color:rgba(178,58,99,.5);box-shadow:inset 0 1px 0 rgba(255,255,255,.35)}
+.nav-item .nav-ico{width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+
+/* ===== 账号管理页 ===== */
+.view{display:none}
+.view.show{display:block}
+.acc-head{text-align:center;margin-bottom:20px}
+.acc-avatar{width:84px;height:84px;margin:0 auto 12px;border-radius:8px;overflow:hidden;cursor:pointer;
+  border:1px solid rgba(178,58,99,.45);box-shadow:inset 0 1px 0 rgba(255,255,255,.5),0 3px 10px rgba(178,58,99,.25)}
+.acc-avatar img{width:100%;height:100%;object-fit:cover;display:block}
+.acc-avatar .no-avatar{width:100%;height:100%;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(180deg,#f8cfdd,#e39eb8);color:#fff;font-size:30px}
+.acc-field{margin-bottom:16px}
+.acc-field label{display:block;font-size:13px;color:var(--ink-600);margin-bottom:6px}
+.acc-field input{
+  width:100%;padding:10px 12px;border:1px solid rgba(178,58,99,.4);border-radius:4px;
+  font-size:14px;outline:none;color:var(--ink-900);background:#fff;
+  box-shadow:inset 0 1px 3px rgba(178,58,99,.12)}
+.acc-field input:focus{border-color:var(--pink-500);box-shadow:inset 0 1px 3px rgba(178,58,99,.12),0 0 0 3px rgba(212,83,126,.22)}
+.acc-tip{font-size:12px;color:var(--ink-400);margin-top:4px}
+.acc-msg{font-size:13px;min-height:20px;margin-bottom:8px;text-align:center}
+.acc-msg.ok{color:var(--ok)}.acc-msg.bad{color:var(--bad)}
+.acc-divider{border:none;border-top:1px solid var(--line);margin:22px 0}
+.acc-hint{text-align:center;font-size:13px;color:var(--ink-400);padding:40px 0}
 </style>
 </head>
 <body>
+<!-- 左上角导航菜单（Win7 立体方框） -->
+<div class="nav-btn" id="navBtn" onclick="toggleNav()">
+  <span class="bar"></span><span class="bar"></span><span class="bar"></span>
+</div>
+<div class="nav-menu" id="navMenu">
+  <div class="nav-item active" id="navHome" onclick="switchView('home')">
+    <span class="nav-ico">🏠</span>首页
+  </div>
+  <div class="nav-item" id="navAccount" onclick="switchView('account')">
+    <span class="nav-ico">👤</span>账号管理
+  </div>
+</div>
 <div class="wrap">
 
+  <!-- ===== 首页视图 ===== -->
+  <div class="view show" id="viewHome">
   <!-- 顶部用户条 -->
   <div class="card">
     <div class="user-bar">
@@ -223,7 +281,50 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
   </div>
 
   <div class="footer">© 2026 91taffy.com · 塔菲的小窝</div>
+  </div>
+  <!-- ===== 账号管理视图 ===== -->
+  <div class="view" id="viewAccount">
+    <div class="card">
+      <div class="acc-head">
+        <div class="acc-avatar" id="accAvatarBox" onclick="document.getElementById('accAvatarInput').click()">
+          <img id="accAvatarImg" alt="头像" style="display:none">
+          <div class="no-avatar" id="accAvatarNo">喵</div>
+        </div>
+        <input type="file" id="accAvatarInput" accept="image/*" style="display:none" onchange="handleAvatar(event)">
+        <h2 style="font-size:20px;color:var(--ink-600)">账号管理</h2>
+      </div>
+      <div class="acc-msg" id="accMsg"></div>
+      <div class="acc-field">
+        <label>昵称</label>
+        <input id="accNick" placeholder="你的昵称" maxlength="20">
+        <div class="acc-tip">展示在你评论旁边的名字喵</div>
+      </div>
+      <button class="btn" style="width:100%" onclick="saveNick()">保存昵称</button>
+      <hr class="acc-divider">
+      <div class="acc-field">
+        <label>更换邮箱</label>
+        <input id="accNewEmail" type="email" placeholder="新邮箱地址">
+        <div class="acc-tip">更换后需要到新邮箱验证喵</div>
+      </div>
+      <div class="acc-field">
+        <label>当前密码（用于安全验证）</label>
+        <input id="accEmailPass" type="password" placeholder="输入当前密码">
+      </div>
+      <button class="btn" style="width:100%" onclick="saveEmail()">更换邮箱</button>
+      <hr class="acc-divider">
+      <div class="acc-field">
+        <label>更换密码</label>
+        <input id="accOldPass" type="password" placeholder="当前密码">
+      </div>
+      <div class="acc-field">
+        <label>新密码</label>
+        <input id="accNewPass" type="password" placeholder="至少6位">
+      </div>
+      <button class="btn" style="width:100%" onclick="savePass()">更换密码</button>
+    </div>
+  </div>
 </div>
+
 
 <!-- 登录弹窗 -->
 <div class="modal-mask" id="loginModal">
@@ -324,6 +425,148 @@ function setCommentLocked(locked){
     if(lock) lock.style.display = 'none';
   }
 }
+
+// ========== 导航菜单（左上角方框） ==========
+function toggleNav(){
+  document.getElementById('navMenu').classList.toggle('show');
+}
+function switchView(name){
+  document.getElementById('navMenu').classList.remove('show');
+  const home = document.getElementById('viewHome');
+  const acc = document.getElementById('viewAccount');
+  const navHome = document.getElementById('navHome');
+  const navAcc = document.getElementById('navAccount');
+  if(name === 'home'){
+    home.classList.add('show');
+    acc.classList.remove('show');
+    navHome.classList.add('active');
+    navAcc.classList.remove('active');
+    // 回到首页刷新评论
+    if(typeof loadComments === 'function') loadComments(true);
+  } else if(name === 'account'){
+    home.classList.remove('show');
+    acc.classList.add('show');
+    navHome.classList.remove('active');
+    navAcc.classList.add('active');
+    loadAccountView();
+  }
+}
+// 点击导航区域外关闭菜单
+document.addEventListener('click', function(e){
+  const btn = document.getElementById('navBtn');
+  const menu = document.getElementById('navMenu');
+  if(btn && menu && !btn.contains(e.target) && !menu.contains(e.target)){
+    menu.classList.remove('show');
+  }
+});
+
+// ========== 账号管理视图 ==========
+let accAvatarUrl = '';
+function loadAccountView(){
+  const msg = document.getElementById('accMsg');
+  if(!currentUser){
+    msg.className = 'acc-msg bad';
+    msg.textContent = '请先登录后再管理账号喵';
+    document.getElementById('accNick').value = '';
+    document.getElementById('accAvatarImg').style.display = 'none';
+    document.getElementById('accAvatarNo').style.display = 'flex';
+    return;
+  }
+  msg.className = 'acc-msg';
+  msg.textContent = '';
+  // 填充当前昵称
+  document.getElementById('accNick').value = currentProfile ? (currentProfile.nickname || '') : '';
+  // 头像显示
+  if(currentProfile && currentProfile.avatar_url){
+    accAvatarUrl = currentProfile.avatar_url;
+    document.getElementById('accAvatarImg').src = accAvatarUrl;
+    document.getElementById('accAvatarImg').style.display = 'block';
+    document.getElementById('accAvatarNo').style.display = 'none';
+  } else {
+    accAvatarUrl = '';
+    document.getElementById('accAvatarImg').style.display = 'none';
+    document.getElementById('accAvatarNo').style.display = 'flex';
+  }
+}
+// 头像选择与压缩上传
+function handleAvatar(event){
+  if(!currentUser){ alert('请先登录喵'); return; }
+  const file = event.target.files[0];
+  if(!file) return;
+  if(!file.type.startsWith('image/')){ alert('请选择图片文件喵'); return; }
+  compressImage(file).then(async (blob) => {
+    const path = `avatars/${currentUser.id}/${Date.now()}.jpg`;
+    try{
+      const { error: upErr } = await supabaseClient.storage.from('avatars').upload(path, blob);
+      if(upErr){ alert('头像上传失败：' + zhErr(upErr.message)); return; }
+      const { data: { publicUrl } } = supabaseClient.storage.from('avatars').getPublicUrl(path);
+      accAvatarUrl = publicUrl;
+      document.getElementById('accAvatarImg').src = accAvatarUrl;
+      document.getElementById('accAvatarImg').style.display = 'block';
+      document.getElementById('accAvatarNo').style.display = 'none';
+      // 保存到资料
+      const { error: up2 } = await supabaseClient.from('profiles').update({ avatar_url: accAvatarUrl }).eq('id', currentUser.id);
+      if(up2){ alert('头像保存失败：' + zhErr(up2.message)); return; }
+      if(currentProfile) currentProfile.avatar_url = accAvatarUrl;
+      showAccMsg('头像已更新喵', true);
+    }catch(e){
+      alert('头像上传异常：' + e.message);
+    }
+  });
+}
+function showAccMsg(text, ok){
+  const msg = document.getElementById('accMsg');
+  msg.className = 'acc-msg ' + (ok ? 'ok' : 'bad');
+  msg.textContent = text;
+}
+async function saveNick(){
+  if(!currentUser){ alert('请先登录喵'); return; }
+  const nick = document.getElementById('accNick').value.trim();
+  if(!nick){ showAccMsg('昵称不能为空喵', false); return; }
+  const { error } = await supabaseClient.from('profiles').update({ nickname: nick }).eq('id', currentUser.id);
+  if(error){ showAccMsg('保存失败：' + zhErr(error.message), false); return; }
+  if(currentProfile) currentProfile.nickname = nick;
+  showAccMsg('昵称已保存喵', true);
+  renderUserBar();
+}
+async function saveEmail(){
+  if(!currentUser){ alert('请先登录喵'); return; }
+  const email = document.getElementById('accNewEmail').value.trim();
+  const pass = document.getElementById('accEmailPass').value;
+  if(!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ showAccMsg('请输入正确的新邮箱喵', false); return; }
+  if(isTemporaryEmail(email)){ showAccMsg('该邮箱为临时邮箱，暂不支持喵', false); return; }
+  if(!pass){ showAccMsg('请输入当前密码用于验证喵', false); return; }
+  try{
+    const { error } = await supabaseClient.auth.updateUser({ email }, { emailRedirectTo: window.location.origin });
+    if(error){ showAccMsg('更换邮箱失败：' + zhErr(error.message), false); return; }
+    showAccMsg('验证邮件已发送到新邮箱，请点击链接确认喵', true);
+    document.getElementById('accNewEmail').value = '';
+    document.getElementById('accEmailPass').value = '';
+  }catch(e){
+    showAccMsg('操作失败：' + e.message, false);
+  }
+}
+async function savePass(){
+  if(!currentUser){ alert('请先登录喵'); return; }
+  const oldP = document.getElementById('accOldPass').value;
+  const newP = document.getElementById('accNewPass').value;
+  if(!oldP){ showAccMsg('请输入当前密码喵', false); return; }
+  if(newP.length < 6){ showAccMsg('新密码至少6位喵', false); return; }
+  // 先验证旧密码（用旧密码重新登录验证）
+  try{
+    const email = currentUser.email;
+    const { error: verr } = await supabaseClient.auth.signInWithPassword({ email, password: oldP });
+    if(verr){ showAccMsg('当前密码不正确喵', false); return; }
+    const { error } = await supabaseClient.auth.updateUser({ password: newP });
+    if(error){ showAccMsg('修改密码失败：' + zhErr(error.message), false); return; }
+    showAccMsg('密码已更新喵', true);
+    document.getElementById('accOldPass').value = '';
+    document.getElementById('accNewPass').value = '';
+  }catch(e){
+    showAccMsg('操作失败：' + e.message, false);
+  }
+}
+
 async function init(){
   renderEmojiPanel();
   // 先上锁，等会话状态出来再解锁
@@ -412,6 +655,29 @@ function isTemporaryEmail(email){
     'dispostable.com','mailnesia.com','temp-mail.org','throwawaymail.com'];
   return blacklist.includes(domain.toLowerCase());
 }
+// 英文报错 -> 中文提示映射（Supabase/Gotrue 常见错误）
+function zhErr(msg){
+  if(!msg) return '操作失败，请稍后再试喵';
+  const m = String(msg);
+  const map = [
+    [/invalid login credentials|Invalid login credentials/i, '邮箱或密码不正确喵'],
+    [/Email not confirmed|email not confirmed/i, '请先到邮箱点击验证链接后再登录喵'],
+    [/is invalid|invalid email|Email address .* is invalid/i, '邮箱格式不正确，请检查后重试喵'],
+    [/already been registered|already registered|User already registered|Email already exists/i, '该邮箱已被注册，请直接登录喵'],
+    [/password.*(too short|should be at least)|at least \d+ characters|Password should be/i, '密码太短啦，至少需要6位喵'],
+    [/user already exists|User already exists/i, '该用户已存在，请直接登录喵'],
+    [/rate limit|too many requests|Requests rate limit/i, '操作太频繁啦，请稍后再试喵'],
+    [/network|fetch failed|Failed to fetch|load failed/i, '网络连接失败，请检查网络后重试喵'],
+    [/unable to validate|token has expired|JWT|invalid token/i, '登录状态已失效，请重新登录喵'],
+    [/for security purposes|signup.*disabled|signups.*not allowed/i, '暂未开放注册，请稍后再试喵'],
+    [/database error|internal error|server error/i, '服务器开小差了，请稍后再试喵'],
+    [/too many email/i, '验证邮件发送太频繁啦，请稍后再试喵']
+  ];
+  for(const [re, zh] of map){
+    if(re.test(m)) return zh;
+  }
+  return m;
+}
 async function doRegister(){
   const email = document.getElementById('regEmail').value.trim();
   const nick = document.getElementById('regNick').value.trim();
@@ -427,7 +693,7 @@ async function doRegister(){
     email, password: pass,
     options:{ data:{ username:nick, nickname:nick, gender } }
   });
-  if(error){ err.textContent = error.message; return; }
+  if(error){ err.textContent = zhErr(error.message); return; }
   if(data.user && data.user.identities && data.user.identities.length === 0){
     err.textContent = '该邮箱已被注册，请直接登录喵';
     return;
@@ -444,8 +710,7 @@ async function doLogin(){
   if(!supabaseClient){ err.textContent='服务暂不可用，请稍后重试喵'; return; }
   const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password: pass });
   if(error){
-    if(error.message.includes('Email not confirmed')) err.textContent='请先到邮箱点击验证链接喵';
-    else err.textContent = error.message;
+    err.textContent = zhErr(error.message);
     return;
   }
   currentUser = data.user;
@@ -531,7 +796,7 @@ async function submitComment(){
   if(selectedPhotoFile){
     const path = `comments/${currentUser.id}/${Date.now()}.jpg`;
     const { error: upErr } = await supabaseClient.storage.from('comment-images').upload(path, selectedPhotoFile);
-    if(upErr){ alert('照片上传失败：' + upErr.message); return; }
+    if(upErr){ alert('照片上传失败：' + zhErr(upErr.message)); return; }
     const { data: { publicUrl } } = supabaseClient.storage.from('comment-images').getPublicUrl(path);
     imageUrl = publicUrl;
   }
@@ -548,7 +813,7 @@ async function submitComment(){
     content,
     image_url: imageUrl
   });
-  if(error){ alert('评论失败：' + error.message); return; }
+  if(error){ alert('评论失败：' + zhErr(error.message)); return; }
   ta.value = '';
   removePhoto();
   await loadComments(true);
@@ -567,7 +832,7 @@ async function loadComments(reset){
     .eq('page_id', PAGE_ID)
     .order('created_at', { ascending:false })
     .range(from, to);
-  if(error){ document.getElementById('commentList').innerHTML = `<div class="empty">加载失败：${error.message}</div>`; return; }
+  if(error){ document.getElementById('commentList').innerHTML = `<div class="empty">加载失败：${zhErr(error.message)}</div>`; return; }
   document.getElementById('commentCount').textContent = count ? `共 ${count} 条` : '';
   const list = document.getElementById('commentList');
   if(!data || data.length === 0){
@@ -612,7 +877,7 @@ function renderComment(c){
 async function deleteComment(id){
   if(!confirm('确定删除这条评论吗喵？')) return;
   const { error } = await supabaseClient.from('comments').delete().eq('id', id);
-  if(error){ alert('删除失败：' + error.message); return; }
+  if(error){ alert('删除失败：' + zhErr(error.message)); return; }
   await loadComments(true);
 }
 
@@ -627,7 +892,7 @@ async function renderAdminPanel(){
   const { data, error } = await supabaseClient.from('profiles')
     .select('id,uid,nickname,username,email,gender,role,status,created_at')
     .order('uid', { ascending:true });
-  if(error){ list.innerHTML = `<div class="empty">加载失败：${error.message}</div>`; return; }
+  if(error){ list.innerHTML = `<div class="empty">加载失败：${zhErr(error.message)}</div>`; return; }
   list.innerHTML = data.map(u => {
     const roleText = u.role==='owner'?'站长':u.role==='admin'?'管理员':'用户';
     const statusText = u.status==='active'?'正常':'已封禁';
@@ -662,13 +927,13 @@ async function renderAdminPanel(){
 async function setRole(userId, role){
   if(!confirm('确定要' + (role==='admin'?'任命为管理员':'取消管理员') + '吗喵？')) return;
   const { error } = await supabaseClient.from('profiles').update({ role }).eq('id', userId);
-  if(error){ alert('操作失败：' + error.message); return; }
+  if(error){ alert('操作失败：' + zhErr(error.message)); return; }
   renderAdminPanel();
 }
 async function setStatus(userId, status){
   if(!confirm('确定要' + (status==='banned'?'封禁':'解封') + '该用户吗喵？')) return;
   const { error } = await supabaseClient.from('profiles').update({ status }).eq('id', userId);
-  if(error){ alert('操作失败：' + error.message); return; }
+  if(error){ alert('操作失败：' + zhErr(error.message)); return; }
   renderAdminPanel();
 }
 
