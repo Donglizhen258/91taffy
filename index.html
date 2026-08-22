@@ -85,6 +85,10 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
   box-shadow:inset 0 1px 3px rgba(178,58,99,.12),inset 0 1px 0 rgba(255,255,255,.8)}
 .field input:focus,.field select:focus{border-color:var(--pink-500);box-shadow:inset 0 1px 3px rgba(178,58,99,.12),0 0 0 3px rgba(212,83,126,.22)}
 .auth-error{color:var(--bad);font-size:13px;min-height:18px;margin-bottom:8px;text-align:center}
+.auth-error.ok{color:var(--ok);font-weight:600}
+.btn[disabled]{opacity:.6;cursor:not-allowed;filter:grayscale(.35)}
+.spinner{display:inline-block;width:13px;height:13px;border:2px solid rgba(255,255,255,.45);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;vertical-align:-2px;margin-right:6px}
+@keyframes spin{to{transform:rotate(360deg)}}
 .auth-tip{font-size:12px;color:var(--ink-400);text-align:center;margin-top:12px}
 .auth-tip a{color:var(--pink-500);cursor:pointer;text-decoration:underline}
 
@@ -126,6 +130,11 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
 .emoji-panel.show{display:flex}
 .emoji-panel img{width:56px;height:56px;object-fit:contain;cursor:pointer;border-radius:4px;transition:.15s}
 .emoji-panel img:hover{transform:scale(1.12);background:rgba(212,83,126,.15);box-shadow:0 2px 6px rgba(178,58,99,.3)}
+
+/* 评论提交状态条（loading/成功/失败） */
+.comment-status{min-height:20px;font-size:13px;color:var(--bad);margin-top:8px;line-height:20px}
+.comment-status.loading{color:var(--pink-500)}
+.comment-status.ok{color:var(--ok);font-weight:600}
 
 /* 评论列表 */
 .comment-item{display:flex;gap:12px;padding:14px 0;border-bottom:1px solid var(--line)}
@@ -323,12 +332,13 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
           <button class="x" onclick="cancelReply()">×</button>
         </div>
         <textarea id="commentInput" placeholder="登录后即可评论喵..."></textarea>
+        <div class="comment-status" id="commentStatus"></div>
         <div class="toolbar">
           <button class="btn btn-ghost btn-small" onclick="toggleEmoji()">表情</button>
           <button class="btn btn-ghost btn-small" onclick="document.getElementById('photoInput').click()">照片</button>
           <input type="file" id="photoInput" accept="image/*" style="display:none" onchange="handlePhoto(event)">
           <span id="photoStatus" class="sub" style="margin-left:auto"></span>
-          <button class="btn btn-small" onclick="submitComment()">发表评论</button>
+          <button class="btn btn-small" id="commentSubmitBtn" onclick="submitComment()">发表评论</button>
         </div>
         <div class="photo-preview" id="photoPreview" style="display:none">
           <img id="previewImg" alt="照片预览">
@@ -467,12 +477,13 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
             <button class="x" onclick="cancelProfileReply()">×</button>
           </div>
           <textarea id="profileCommentInput" placeholder="说点什么喵..."></textarea>
+          <div class="comment-status" id="profileCommentStatus"></div>
           <div class="toolbar">
             <button class="btn btn-ghost btn-small" onclick="toggleProfileEmoji()">表情</button>
             <button class="btn btn-ghost btn-small" onclick="document.getElementById('profilePhotoInput').click()">照片</button>
             <input type="file" id="profilePhotoInput" accept="image/*" style="display:none" onchange="handleProfilePhoto(event)">
             <span id="profilePhotoStatus" class="sub" style="margin-left:auto"></span>
-            <button class="btn btn-small" onclick="submitProfileComment()">发表评论</button>
+            <button class="btn btn-small" id="profileCommentSubmitBtn" onclick="submitProfileComment()">发表评论</button>
           </div>
           <div class="photo-preview" id="profilePhotoPreview" style="display:none">
             <img id="profilePreviewImg" alt="照片预览">
@@ -495,7 +506,7 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
     <div class="auth-error" id="loginError"></div>
     <div class="field"><label>邮箱</label><input id="loginEmail" type="email" placeholder="you@example.com"></div>
     <div class="field"><label>密码</label><input id="loginPass" type="password" placeholder="密码"></div>
-    <button class="btn" style="width:100%" onclick="doLogin()">登录</button>
+    <button class="btn" id="loginBtn" style="width:100%" onclick="doLogin()">登录</button>
     <div class="auth-tip">还没有账号？<a onclick="showRegister()">去注册</a></div>
     <div class="auth-tip"><a onclick="closeModal('loginModal')">关闭</a></div>
   </div>
@@ -516,7 +527,7 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
         <option value="女">女</option>
       </select>
     </div>
-    <button class="btn" style="width:100%" onclick="doRegister()">注册</button>
+    <button class="btn" id="regBtn" style="width:100%" onclick="doRegister()">注册</button>
     <div class="auth-tip">已有账号？<a onclick="showLogin()">去登录</a></div>
     <div class="auth-tip"><a onclick="closeModal('regModal')">关闭</a></div>
   </div>
@@ -946,44 +957,87 @@ function zhErr(msg){
   }
   return m;
 }
+// 登录/注册按钮加载态切换（点击后禁按钮+转圈，请求结束恢复）
+function setAuthLoading(btn, loading, text){
+  if(!btn) return;
+  if(loading){
+    if(!btn.dataset.orig) btn.dataset.orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>' + (text || '处理中…');
+  } else {
+    btn.disabled = false;
+    if(btn.dataset.orig){ btn.innerHTML = btn.dataset.orig; delete btn.dataset.orig; }
+  }
+}
 async function doRegister(){
   const email = document.getElementById('regEmail').value.trim();
   const nick = document.getElementById('regNick').value.trim();
   const pass = document.getElementById('regPass').value;
   const gender = document.getElementById('regGender').value;
   const err = document.getElementById('regError');
+  const btn = document.getElementById('regBtn');
+  err.classList.remove('ok');
   if(!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ err.textContent='请输入正确的邮箱'; return; }
   if(isTemporaryEmail(email)){ err.textContent='该邮箱为临时邮箱，暂不支持注册喵'; return; }
   if(!nick){ err.textContent='请输入昵称'; return; }
   if(pass.length < 6){ err.textContent='密码至少6位'; return; }
   if(!supabaseClient){ err.textContent='服务暂不可用，请稍后重试喵'; return; }
+  err.textContent = '';
+  setAuthLoading(btn, true, '注册中…');
   const { data, error } = await supabaseClient.auth.signUp({
     email, password: pass,
     options:{ data:{ username:nick, nickname:nick, gender } }
   });
-  if(error){ err.textContent = zhErr(error.message); return; }
+  if(error){
+    setAuthLoading(btn, false);
+    err.textContent = zhErr(error.message);
+    return;
+  }
   if(data.user && data.user.identities && data.user.identities.length === 0){
+    setAuthLoading(btn, false);
     err.textContent = '该邮箱已被注册，请直接登录喵';
     return;
   }
-  err.style.color = 'var(--ok)';
-  err.textContent = '注册成功！请到邮箱查收验证邮件，点击验证链接后即可登录喵';
-  setTimeout(()=>closeModal('regModal'), 3000);
+  err.classList.add('ok');
+  err.textContent = '✓ 注册成功！请到邮箱查收验证邮件，点击验证链接后即可登录喵';
+  btn.innerHTML = '注册成功 ✓';
+  btn.disabled = true;
+  setTimeout(()=>{
+    closeModal('regModal');
+    btn.disabled = false;
+    btn.innerHTML = '注册';
+    delete btn.dataset.orig;
+    err.classList.remove('ok');
+    err.textContent = '';
+  }, 2000);
 }
 async function doLogin(){
   const email = document.getElementById('loginEmail').value.trim();
   const pass = document.getElementById('loginPass').value;
   const err = document.getElementById('loginError');
+  const btn = document.getElementById('loginBtn');
+  err.classList.remove('ok');
   if(!email || !pass){ err.textContent='请输入邮箱和密码'; return; }
   if(!supabaseClient){ err.textContent='服务暂不可用，请稍后重试喵'; return; }
+  err.textContent = '';
+  setAuthLoading(btn, true, '登录中…');
   const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password: pass });
   if(error){
+    setAuthLoading(btn, false);
     err.textContent = zhErr(error.message);
     return;
   }
   currentUser = data.user;
   const { data: prof } = await supabaseClient.from('profiles').select('*').eq('id', data.user.id).single();
-  if(prof && prof.status === 'banned'){
+  if(!prof){
+    // 账号资料缺失（常见于注册时 profiles 插入失败的残留账号）
+    setAuthLoading(btn, false);
+    err.textContent = '账号资料缺失，请重新注册或联系站长处理喵';
+    await supabaseClient.auth.signOut();
+    currentUser = null;
+    return;
+  }
+  if(prof.status === 'banned'){
     let banMsg = '你已被封禁喵';
     if(prof.ban_until){
       const remain = new Date(prof.ban_until).getTime() - Date.now();
@@ -991,13 +1045,18 @@ async function doLogin(){
       if(days > 36500){ banMsg = '你已被封禁，剩余封禁天数：永久喵'; }
       else if(days > 0){ banMsg = `你已被封禁，剩余封禁天数：${days} 天喵`; }
     }
+    setAuthLoading(btn, false);
     err.textContent = banMsg;
     await supabaseClient.auth.signOut();
     currentUser = null;
     return;
   }
   currentProfile = prof;
-  closeModal('loginModal');
+  // 成功反馈：绿色提示 + 按钮成功态，稍后关闭弹窗
+  err.classList.add('ok');
+  err.textContent = '✓ 登录成功！';
+  btn.innerHTML = '登录成功 ✓';
+  btn.disabled = true;
   renderUserBar();
   // 根据角色决定「网站管理」菜单的可见性
   const navAdmin = document.getElementById('navAdmin');
@@ -1008,6 +1067,14 @@ async function doLogin(){
     if(navAdmin) navAdmin.style.display = 'none';
   }
   setCommentLocked(false); // 登录成功，解锁评论区
+  setTimeout(()=>{
+    closeModal('loginModal');
+    btn.disabled = false;
+    btn.innerHTML = '登录';
+    delete btn.dataset.orig;
+    err.classList.remove('ok');
+    err.textContent = '';
+  }, 600);
   if(ACTIVE === 'profile' && viewingUserId){
     await loadProfile(viewingUserId); // 资料页登录：刷新资料与封禁区
   } else {
@@ -1152,6 +1219,26 @@ function resolveRootId(id){
   return r ? r.parent_id : id;                          // 二级评论，根是其 parent_id
 }
 
+// 评论提交按钮加载态切换（防连点 + 转圈反馈）
+function setCommentBtnLoading(btn, loading, text){
+  if(!btn) return;
+  if(loading){
+    if(!btn.dataset.orig) btn.dataset.orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>' + (text || '发布中…');
+  } else {
+    btn.disabled = false;
+    if(btn.dataset.orig){ btn.innerHTML = btn.dataset.orig; delete btn.dataset.orig; }
+  }
+}
+// 评论状态条显示：loading='' 表示普通提示
+function setCommentStatus(id, msg, cls){
+  const el = document.getElementById(id);
+  if(!el) return;
+  el.className = 'comment-status' + (cls ? ' ' + cls : '');
+  el.innerHTML = msg;
+}
+
 async function submitComment(){
   if(!currentUser){ alert('请先登录喵'); return; }
   const ta = document.getElementById('commentInput');
@@ -1160,41 +1247,53 @@ async function submitComment(){
   // 表情数量限制：最多 25 个
   const emojiCount = (text.match(/\[em:/g) || []).length;
   if(emojiCount > MAX_EMOJI){ alert(`一个评论最多放 ${MAX_EMOJI} 个表情喵`); return; }
+  const btn = document.getElementById('commentSubmitBtn');
+  setCommentStatus('commentStatus', '<span class="spinner"></span> 正在发布评论…', 'loading');
+  setCommentBtnLoading(btn, true, '发布中…');
   let imageUrl = '';
-  if(selectedPhotoFile){
-    const path = `comments/${currentUser.id}/${Date.now()}.jpg`;
-    const { error: upErr } = await supabaseClient.storage.from('comment-images').upload(path, selectedPhotoFile);
-    if(upErr){ alert('照片上传失败：' + zhErr(upErr.message)); return; }
-    const { data: { publicUrl } } = supabaseClient.storage.from('comment-images').getPublicUrl(path);
-    imageUrl = publicUrl;
+  try{
+    if(selectedPhotoFile){
+      const path = `comments/${currentUser.id}/${Date.now()}.jpg`;
+      const { error: upErr } = await supabaseClient.storage.from('comment-images').upload(path, selectedPhotoFile);
+      if(upErr) throw new Error('照片上传失败：' + zhErr(upErr.message));
+      const { data: { publicUrl } } = supabaseClient.storage.from('comment-images').getPublicUrl(path);
+      imageUrl = publicUrl;
+    }
+    // 转义内容中的表情标记
+    let content = text;
+    EMOJIS.forEach(([name]) => {
+      const marker = `[em:${name}]`;
+      const repl = `<img class="emoji" src="${EMOJIS.find(e=>e[0]===name)[1]}" alt="${name}">`;
+      content = content.split(marker).join(repl);
+    });
+    // 二级评论：parent_id 指向根一级评论，reply_to 记录回复对象昵称
+    let parentId = null;
+    let replyToName = '';
+    if(replyTo){
+      parentId = resolveRootId(replyTo.id);
+      replyToName = replyTo.name;
+    }
+    const { error } = await supabaseClient.from('comments').insert({
+      page_id: PAGE_ID,
+      author_id: currentUser.id,
+      content,
+      image_url: imageUrl,
+      parent_id: parentId,
+      reply_to: replyToName
+    });
+    if(error) throw new Error('评论失败：' + zhErr(error.message));
+    // 成功：清空输入框，绿色提示后淡出
+    ta.value = '';
+    removePhoto();
+    cancelReply();
+    setCommentBtnLoading(btn, false);
+    setCommentStatus('commentStatus', '✓ 评论发布成功喵', 'ok');
+    await loadComments(false);
+    setTimeout(()=>{ setCommentStatus('commentStatus', '', ''); }, 2600);
+  }catch(err){
+    setCommentBtnLoading(btn, false);
+    setCommentStatus('commentStatus', err.message || '评论失败，请稍后再试喵', '');
   }
-  // 转义内容中的表情标记
-  let content = text;
-  EMOJIS.forEach(([name]) => {
-    const marker = `[em:${name}]`;
-    const repl = `<img class="emoji" src="${EMOJIS.find(e=>e[0]===name)[1]}" alt="${name}">`;
-    content = content.split(marker).join(repl);
-  });
-  // 二级评论：parent_id 指向根一级评论，reply_to 记录回复对象昵称
-  let parentId = null;
-  let replyToName = '';
-  if(replyTo){
-    parentId = resolveRootId(replyTo.id);
-    replyToName = replyTo.name;
-  }
-  const { error } = await supabaseClient.from('comments').insert({
-    page_id: PAGE_ID,
-    author_id: currentUser.id,
-    content,
-    image_url: imageUrl,
-    parent_id: parentId,
-    reply_to: replyToName
-  });
-  if(error){ alert('评论失败：' + zhErr(error.message)); return; }
-  ta.value = '';
-  removePhoto();
-  cancelReply();
-  await loadComments(false);
 }
 
 async function loadComments(reset){
@@ -1206,7 +1305,7 @@ async function loadComments(reset){
   // 1. 一级评论（时间正序，用于定楼层）
   const { data: firsts, error: e1 } = await supabaseClient
     .from('comments')
-    .select('*, author:profiles(id,nickname,username,uid,role,avatar_url)')
+    .select('*, author:profiles!comments_author_id_fkey(id,nickname,username,uid,role,avatar_url)')
     .eq('page_id', PAGE_ID)
     .is('parent_id', null)
     .order('created_at', { ascending:true });
@@ -1214,7 +1313,7 @@ async function loadComments(reset){
   // 2. 二级评论（时间正序）
   const { data: replies, error: e2 } = await supabaseClient
     .from('comments')
-    .select('*, author:profiles(id,nickname,username,uid,role,avatar_url)')
+    .select('*, author:profiles!comments_author_id_fkey(id,nickname,username,uid,role,avatar_url)')
     .eq('page_id', PAGE_ID)
     .not('parent_id', 'is', null)
     .order('created_at', { ascending:true });
@@ -1504,14 +1603,14 @@ async function loadProfileComments(reset){
   }
   const { data: firsts, error: e1 } = await supabaseClient
     .from('comments')
-    .select('*, author:profiles(id,nickname,username,uid,role,avatar_url)')
+    .select('*, author:profiles!comments_author_id_fkey(id,nickname,username,uid,role,avatar_url)')
     .eq('page_id', PAGE_ID)
     .is('parent_id', null)
     .order('created_at', { ascending:true });
   if(e1){ document.getElementById('profileCommentList').innerHTML = `<div class="empty">加载失败：${zhErr(e1.message)}</div>`; return; }
   const { data: replies } = await supabaseClient
     .from('comments')
-    .select('*, author:profiles(id,nickname,username,uid,role,avatar_url)')
+    .select('*, author:profiles!comments_author_id_fkey(id,nickname,username,uid,role,avatar_url)')
     .eq('page_id', PAGE_ID)
     .not('parent_id', 'is', null)
     .order('created_at', { ascending:true });
@@ -1587,39 +1686,50 @@ async function submitProfileComment(){
   if(!text && !pPhotoFile){ alert('说点什么再发喵'); return; }
   const emojiCount = (text.match(/\[em:/g) || []).length;
   if(emojiCount > MAX_EMOJI){ alert(`一个评论最多放 ${MAX_EMOJI} 个表情喵`); return; }
+  const btn = document.getElementById('profileCommentSubmitBtn');
+  setCommentStatus('profileCommentStatus', '<span class="spinner"></span> 正在发布评论…', 'loading');
+  setCommentBtnLoading(btn, true, '发布中…');
   let imageUrl = '';
-  if(pPhotoFile){
-    const path = `comments/${currentUser.id}/${Date.now()}.jpg`;
-    const { error: upErr } = await supabaseClient.storage.from('comment-images').upload(path, pPhotoFile);
-    if(upErr){ alert('照片上传失败：' + zhErr(upErr.message)); return; }
-    const { data: { publicUrl } } = supabaseClient.storage.from('comment-images').getPublicUrl(path);
-    imageUrl = publicUrl;
+  try{
+    if(pPhotoFile){
+      const path = `comments/${currentUser.id}/${Date.now()}.jpg`;
+      const { error: upErr } = await supabaseClient.storage.from('comment-images').upload(path, pPhotoFile);
+      if(upErr) throw new Error('照片上传失败：' + zhErr(upErr.message));
+      const { data: { publicUrl } } = supabaseClient.storage.from('comment-images').getPublicUrl(path);
+      imageUrl = publicUrl;
+    }
+    let content = text;
+    EMOJIS.forEach(([name]) => {
+      const marker = `[em:${name}]`;
+      const repl = `<img class="emoji" src="${EMOJIS.find(e=>e[0]===name)[1]}" alt="${name}">`;
+      content = content.split(marker).join(repl);
+    });
+    let parentId = null;
+    let replyToName = '';
+    if(pReplyTo){
+      parentId = resolveRootId(pReplyTo.id);
+      replyToName = pReplyTo.name;
+    }
+    const { error } = await supabaseClient.from('comments').insert({
+      page_id: PAGE_ID,
+      author_id: currentUser.id,
+      content,
+      image_url: imageUrl,
+      parent_id: parentId,
+      reply_to: replyToName
+    });
+    if(error) throw new Error('评论失败：' + zhErr(error.message));
+    ta.value = '';
+    removeProfilePhoto();
+    cancelProfileReply();
+    setCommentBtnLoading(btn, false);
+    setCommentStatus('profileCommentStatus', '✓ 评论发布成功喵', 'ok');
+    await loadProfileComments(false);
+    setTimeout(()=>{ setCommentStatus('profileCommentStatus', '', ''); }, 2600);
+  }catch(err){
+    setCommentBtnLoading(btn, false);
+    setCommentStatus('profileCommentStatus', err.message || '评论失败，请稍后再试喵', '');
   }
-  let content = text;
-  EMOJIS.forEach(([name]) => {
-    const marker = `[em:${name}]`;
-    const repl = `<img class="emoji" src="${EMOJIS.find(e=>e[0]===name)[1]}" alt="${name}">`;
-    content = content.split(marker).join(repl);
-  });
-  let parentId = null;
-  let replyToName = '';
-  if(pReplyTo){
-    parentId = resolveRootId(pReplyTo.id);
-    replyToName = pReplyTo.name;
-  }
-  const { error } = await supabaseClient.from('comments').insert({
-    page_id: PAGE_ID,
-    author_id: currentUser.id,
-    content,
-    image_url: imageUrl,
-    parent_id: parentId,
-    reply_to: replyToName
-  });
-  if(error){ alert('评论失败：' + zhErr(error.message)); return; }
-  ta.value = '';
-  removeProfilePhoto();
-  cancelProfileReply();
-  await loadProfileComments(false);
 }
 function renderProfileEmojiPanel(){
   if(pEmojiRendered) return;

@@ -10,8 +10,9 @@
 -- 后续普通用户从 uid2 起递增
 -- ============================================================
 create sequence if not exists public.uid_seq start 1;
--- 兜底：若之前误建过 start 0 的旧序列，重置为从 1 开始
-alter sequence public.uid_seq restart with 1;
+-- 注意：不要在这里 alter sequence restart with 1 或对齐序列。
+-- 重复执行时若把序列 reset 回 1，会导致新注册 uid 与已有 uid 冲突、注册回滚。
+-- 序列对齐请单独执行 migrations/20260823030000_fix_uid_sequence.sql。
 
 -- ============================================================
 -- 1. 用户资料表（含 uid / 角色 / 状态 / 性别）
