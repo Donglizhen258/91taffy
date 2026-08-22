@@ -45,6 +45,8 @@ create table if not exists public.images (
 
 -- ============================================================
 -- 3. 通用评论表（每页通用，page_id 定位页面）
+--    二级评论：parent_id 指向一级评论；reply_to 记录回复对象昵称
+--    like_count：点赞数（由 comment_likes 触发器维护）
 -- ============================================================
 create table if not exists public.comments (
   id uuid primary key default gen_random_uuid(),
@@ -52,9 +54,14 @@ create table if not exists public.comments (
   author_id uuid references public.profiles(id) on delete set null,
   content text not null,
   image_url text default '',                 -- 评论附带照片（压缩后上传到Storage）
+  parent_id uuid references public.comments(id) on delete cascade,  -- 二级评论归属
+  reply_to text default '',                  -- 回复对象昵称
+  like_count integer not null default 0,     -- 点赞数
   created_at timestamptz default now() not null
 );
 create index if not exists idx_comments_page on public.comments(page_id, created_at desc);
+create index if not exists idx_comments_parent on public.comments(parent_id);
+create index if not exists idx_comments_page_likes on public.comments(page_id, like_count desc);
 
 -- ============================================================
 -- 4. 文章表
@@ -121,6 +128,7 @@ create policy "auth delete own images" on public.images
   for delete using (auth.uid() = author_id);
 
 -- 评论：所有人可读；登录且未封禁用户可发表；本人/站长/管理员可删
+-- 删除规则（2026-08-23 升级）：本人可删自己的评论；站长/管理员可删任意；楼主可删自己一级评论下的二级评论
 create policy "public read comments" on public.comments
   for select using (true);
 create policy "auth insert comments" on public.comments
@@ -133,6 +141,11 @@ create policy "auth delete comments" on public.comments
     auth.uid() = author_id
     or exists (select 1 from public.profiles p
                where p.id = auth.uid() and p.role in ('owner','admin'))
+    or exists (
+      select 1 from public.comments parent
+      where parent.id = comments.parent_id
+        and parent.author_id = auth.uid()
+    )
   );
 
 -- 文章：所有人可读已发布；站长/管理员可管理
@@ -243,7 +256,45 @@ create policy "auth read own comment_log" on public.comment_log
   for select using (auth.uid() = author_id);
 
 -- ============================================================
--- 12. Storage 桶（2026-08-22 追加）
+-- 12. 点赞表 comment_likes（2026-08-23 追加）
+-- (comment_id, user_id) 复合主键防重复点赞
+-- ============================================================
+create table if not exists public.comment_likes (
+  comment_id uuid references public.comments(id) on delete cascade not null,
+  user_id uuid references public.profiles(id) on delete cascade not null,
+  created_at timestamptz default now() not null,
+  primary key (comment_id, user_id)
+);
+alter table public.comment_likes enable row level security;
+create policy "public read comment_likes" on public.comment_likes
+  for select using (true);
+create policy "auth insert comment_likes" on public.comment_likes
+  for insert with check (auth.uid() = user_id);
+create policy "auth delete comment_likes" on public.comment_likes
+  for delete using (auth.uid() = user_id);
+
+-- 点赞计数同步触发器
+create or replace function public.sync_comment_like_count()
+returns trigger as $$
+begin
+  if tg_op = 'INSERT' then
+    update public.comments set like_count = like_count + 1 where id = new.comment_id;
+    return new;
+  elsif tg_op = 'DELETE' then
+    update public.comments set like_count = greatest(like_count - 1, 0) where id = old.comment_id;
+    return old;
+  end if;
+  return null;
+end;
+$$ language plpgsql security definer;
+
+drop trigger if exists trg_comment_likes_sync on public.comment_likes;
+create trigger trg_comment_likes_sync
+  after insert or delete on public.comment_likes
+  for each row execute procedure public.sync_comment_like_count();
+
+-- ============================================================
+-- 13. Storage 桶（2026-08-22 追加）
 -- 头像桶 avatars、评论照片桶 comment-images
 -- 修复 Bucket not found 报错。完整版本见同目录 migrations/20260822120000_create_storage_buckets.sql
 -- ============================================================

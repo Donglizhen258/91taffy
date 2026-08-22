@@ -143,8 +143,33 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
 .comment-content .emoji{display:inline-block;width:22px;height:22px;vertical-align:-4px;margin:0 1px}
 .comment-img{margin-top:8px;max-width:100%;max-height:260px;border:1px solid rgba(178,58,99,.4);border-radius:4px;
   box-shadow:0 3px 8px rgba(178,58,99,.25)}
-.comment-actions{margin-top:6px}
+.comment-actions{margin-top:6px;display:flex;align-items:center;flex-wrap:wrap}
 .comment-actions .btn-small{margin-right:6px}
+/* 评论排序按钮 */
+.sort-btns{display:flex;gap:6px;flex-wrap:wrap}
+.sort-btn{padding:3px 10px;font-size:12px;border:1px solid rgba(212,83,126,.35);border-radius:4px;
+  background:rgba(255,255,255,.6);color:var(--ink-600);cursor:pointer;transition:.15s}
+.sort-btn:hover{background:rgba(255,234,242,.8)}
+.sort-btn.active{background:linear-gradient(180deg,#f8cfdd,#e39eb8);color:#fff;border-color:rgba(178,58,99,.5);font-weight:600}
+/* 回复指示条 */
+.reply-bar{display:flex;align-items:center;gap:8px;margin-bottom:8px;padding:6px 10px;
+  background:rgba(255,234,242,.7);border:1px dashed rgba(212,83,126,.45);border-radius:4px;font-size:13px;color:var(--ink-600)}
+.reply-bar .x{background:linear-gradient(180deg,#f09595,#bd4b4b);color:#fff;border:none;border-radius:50%;
+  width:20px;height:20px;cursor:pointer;font-size:12px;line-height:18px;text-align:center;flex-shrink:0}
+/* 评论底部：时间 + 楼层 */
+.comment-foot{display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-top:6px}
+.comment-time{font-size:11px;color:var(--ink-400)}
+.comment-floor{font-size:11px;color:var(--pink-500);font-weight:600}
+/* 点赞按钮 */
+.like-btn.liked{color:var(--pink-500);font-weight:700}
+/* 二级评论区 */
+.replies{margin-top:10px;padding-left:12px;border-left:2px solid rgba(212,83,126,.25)}
+.reply-item{display:flex;gap:10px;padding:8px 0;border-bottom:1px dashed rgba(212,83,126,.18)}
+.reply-item:last-child{border-bottom:none}
+.comment-avatar.small{width:30px;height:30px;border-radius:4px;font-size:12px}
+.reply-to{color:var(--ink-500);font-size:13px}
+.expand-replies{margin-top:6px;font-size:12px;color:var(--pink-500);cursor:pointer;user-select:none}
+.expand-replies:hover{text-decoration:underline}
 
 /* 管理面板 */
 .admin-panel{
@@ -253,6 +278,12 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
     <div class="comments-head">
       <h2>评论区</h2>
       <span id="commentCount" class="sub"></span>
+      <div class="sort-btns">
+        <button class="sort-btn active" data-sort="time_desc" onclick="setSort('time_desc')">最新</button>
+        <button class="sort-btn" data-sort="time_asc" onclick="setSort('time_asc')">最早</button>
+        <button class="sort-btn" data-sort="likes_desc" onclick="setSort('likes_desc')">最多赞</button>
+        <button class="sort-btn" data-sort="likes_asc" onclick="setSort('likes_asc')">最少赞</button>
+      </div>
     </div>
     <div class="comment-form" id="commentForm">
       <!-- 未登录锁定界面 -->
@@ -266,6 +297,10 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
       </div>
       <!-- 已登录评论区（默认隐藏，登录后显示） -->
       <div id="commentFormInner">
+        <div id="replyBar" class="reply-bar" style="display:none">
+          <span>回复 <b id="replyToName"></b>：</span>
+          <button class="x" onclick="cancelReply()">×</button>
+        </div>
         <textarea id="commentInput" placeholder="登录后即可评论喵..."></textarea>
         <div class="toolbar">
           <button class="btn btn-ghost btn-small" onclick="toggleEmoji()">表情</button>
@@ -405,23 +440,21 @@ const PAGE_ID = 'home';
 
 // ========== 塔菲表情包（16个动态GIF，B站专栏 cv24502948 高清动态表情） ==========
 // 来源：https://www.bilibili.com/read/cv24502948（永雏塔菲QQ装扮高清动态表情包）
-// 命名：沿用塔菲装扮表情官方名（NO喵!/不理你了/.../生日快乐）
+// 命名：雏草姬 2026-08-23 逐一确认的正确名称
 const EMOJIS = [
-  ['害羞','assets/emojis/no.gif'],['困了','assets/emojis/buli.gif'],
-  ['打雷拳','assets/emojis/chaoxiao.gif'],['好滴','assets/emojis/duiya.gif'],
-  ['羞羞','assets/emojis/ganga.gif'],['干杯','assets/emojis/hahaha.gif'],
-  ['问好','assets/emojis/haore.gif'],['生气','assets/emojis/huhumiao.gif'],
-  ['开森','assets/emojis/kaipaidui.gif'],['说','assets/emojis/lei.gif'],
-  ['呆','assets/emojis/miaomiaoquan.gif'],['比耶','assets/emojis/motou.gif'],
-  ['偷笑','assets/emojis/qinzui.gif'],['哈哈','assets/emojis/shanliang.gif'],
-  ['卖萌','assets/emojis/shengri.gif'],['嗨','assets/emojis/xingfen.gif']
+  ['在干嘛','assets/emojis/no.gif'],['吓','assets/emojis/buli.gif'],
+  ['打喵拳','assets/emojis/chaoxiao.gif'],['无语','assets/emojis/duiya.gif'],
+  ['饿饿','assets/emojis/ganga.gif'],['舔屏','assets/emojis/hahaha.gif'],
+  ['笑嘻嘻','assets/emojis/haore.gif'],['嗯嗯','assets/emojis/huhumiao.gif'],
+  ['辛苦喵','assets/emojis/kaipaidui.gif'],['捏脸','assets/emojis/lei.gif'],
+  ['乖','assets/emojis/miaomiaoquan.gif'],['呼呼喵','assets/emojis/motou.gif'],
+  ['哼','assets/emojis/qinzui.gif'],['开可乐','assets/emojis/shanliang.gif'],
+  ['哭哭喵','assets/emojis/shengri.gif'],['滚','assets/emojis/xingfen.gif']
 ];
 
 let currentUser = null;
 let currentProfile = null;
 let selectedPhotoFile = null;
-let currentPage = 1;
-const PAGE_SIZE = 20;
 
 // ========== 初始化 ==========
 // 评论区锁定/解锁控制
@@ -845,11 +878,53 @@ function removePhoto(){
 }
 
 // ========== 评论 ==========
+const MAX_EMOJI = 25;       // 一个评论最多 25 个表情
+const REPLIES_COLLAPSE = 3; // 一级评论下超过 3 条二级评论折叠
+let sortMode = 'time_desc'; // time_desc / time_asc / likes_desc / likes_asc
+let replyTo = null;         // { id, name } 正在回复的评论
+let allComments = [];       // 当前页所有一级评论（时间正序）
+let allReplies = [];        // 当前页所有二级评论（时间正序）
+let likedSet = new Set();   // 当前用户点赞过的评论 id
+
+function fmtTime(iso){
+  const d = new Date(iso);
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+function setSort(mode){
+  sortMode = mode;
+  document.querySelectorAll('.sort-btn').forEach(b => b.classList.toggle('active', b.dataset.sort === mode));
+  renderCommentList();
+}
+function startReply(id){
+  if(!currentUser){ alert('请先登录喵'); return; }
+  const c = allComments.find(x => x.id === id) || allReplies.find(x => x.id === id);
+  const a = (c && c.author) || {};
+  replyTo = { id, name: a.nickname || a.username || '神秘用户' };
+  document.getElementById('replyToName').textContent = replyTo.name;
+  document.getElementById('replyBar').style.display = 'flex';
+  const ta = document.getElementById('commentInput');
+  ta.focus();
+  ta.scrollIntoView({ behavior:'smooth', block:'center' });
+}
+function cancelReply(){
+  replyTo = null;
+  document.getElementById('replyBar').style.display = 'none';
+}
+function resolveRootId(id){
+  if(allComments.some(c => c.id === id)) return id;  // 一级评论，根就是自己
+  const r = allReplies.find(c => c.id === id);
+  return r ? r.parent_id : id;                       // 二级评论，根是其 parent_id
+}
+
 async function submitComment(){
   if(!currentUser){ alert('请先登录喵'); return; }
   const ta = document.getElementById('commentInput');
   const text = ta.value.trim();
   if(!text && !selectedPhotoFile){ alert('说点什么再发喵'); return; }
+  // 表情数量限制：最多 25 个
+  const emojiCount = (text.match(/\[em:/g) || []).length;
+  if(emojiCount > MAX_EMOJI){ alert(`一个评论最多放 ${MAX_EMOJI} 个表情喵`); return; }
   let imageUrl = '';
   if(selectedPhotoFile){
     const path = `comments/${currentUser.id}/${Date.now()}.jpg`;
@@ -865,75 +940,193 @@ async function submitComment(){
     const repl = `<img class="emoji" src="${EMOJIS.find(e=>e[0]===name)[1]}" alt="${name}">`;
     content = content.split(marker).join(repl);
   });
+  // 二级评论：parent_id 指向根一级评论，reply_to 记录回复对象昵称
+  let parentId = null;
+  let replyToName = '';
+  if(replyTo){
+    parentId = resolveRootId(replyTo.id);
+    replyToName = replyTo.name;
+  }
   const { error } = await supabaseClient.from('comments').insert({
     page_id: PAGE_ID,
     author_id: currentUser.id,
     content,
-    image_url: imageUrl
+    image_url: imageUrl,
+    parent_id: parentId,
+    reply_to: replyToName
   });
   if(error){ alert('评论失败：' + zhErr(error.message)); return; }
   ta.value = '';
   removePhoto();
+  cancelReply();
   await loadComments(true);
 }
+
 async function loadComments(reset){
-  if(reset){ currentPage = 1; }
   if(!supabaseClient){
     document.getElementById('commentList').innerHTML = `<div class="empty">评论服务暂不可用，请稍后刷新喵</div>`;
     return;
   }
-  const from = (currentPage-1)*PAGE_SIZE;
-  const to = from + PAGE_SIZE - 1;
-  const { data, error, count } = await supabaseClient
+  // 1. 一级评论（时间正序，用于定楼层）
+  const { data: firsts, error: e1 } = await supabaseClient
     .from('comments')
-    .select('*, author:profiles(id,nickname,username,uid,role)', { count:'exact' })
+    .select('*, author:profiles(id,nickname,username,uid,role,avatar_url)')
     .eq('page_id', PAGE_ID)
-    .order('created_at', { ascending:false })
-    .range(from, to);
-  if(error){ document.getElementById('commentList').innerHTML = `<div class="empty">加载失败：${zhErr(error.message)}</div>`; return; }
-  document.getElementById('commentCount').textContent = count ? `共 ${count} 条` : '';
+    .is('parent_id', null)
+    .order('created_at', { ascending:true });
+  if(e1){ document.getElementById('commentList').innerHTML = `<div class="empty">加载失败：${zhErr(e1.message)}</div>`; return; }
+  // 2. 二级评论（时间正序）
+  const { data: replies, error: e2 } = await supabaseClient
+    .from('comments')
+    .select('*, author:profiles(id,nickname,username,uid,role,avatar_url)')
+    .eq('page_id', PAGE_ID)
+    .not('parent_id', 'is', null)
+    .order('created_at', { ascending:true });
+  if(e2){ replies = []; }
+  allComments = firsts || [];
+  allReplies = replies || [];
+  // 3. 当前用户点赞集合
+  likedSet = new Set();
+  if(currentUser){
+    const { data: likes } = await supabaseClient
+      .from('comment_likes').select('comment_id').eq('user_id', currentUser.id);
+    likedSet = new Set((likes || []).map(l => l.comment_id));
+  }
+  document.getElementById('commentCount').textContent = allComments.length ? `共 ${allComments.length} 条` : '';
+  renderCommentList();
+}
+
+function renderCommentList(){
   const list = document.getElementById('commentList');
-  if(!data || data.length === 0){
+  if(!allComments.length){
     list.innerHTML = `<div class="empty">还没有评论，快来抢沙发喵~</div>`;
     return;
   }
-  list.innerHTML = data.map(c => renderComment(c)).join('');
-  if(count > currentPage * PAGE_SIZE){
-    list.insertAdjacentHTML('beforeend',
-      `<div style="text-align:center;margin-top:10px"><button class="btn btn-ghost btn-small" onclick="loadComments(false)">加载更多</button></div>`);
-  }
+  // 楼层：按时间正序（最早=1楼）
+  const chrono = [...allComments].sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
+  const floorMap = {};
+  chrono.forEach((c, i) => floorMap[c.id] = i + 1);
+  // 显示排序
+  let sorted = [...allComments];
+  if(sortMode === 'time_asc') sorted.sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
+  else if(sortMode === 'time_desc') sorted.sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+  else if(sortMode === 'likes_desc') sorted.sort((a,b) => (b.like_count||0) - (a.like_count||0) || (new Date(b.created_at) - new Date(a.created_at)));
+  else if(sortMode === 'likes_asc') sorted.sort((a,b) => (a.like_count||0) - (b.like_count||0) || (new Date(a.created_at) - new Date(b.created_at)));
+  list.innerHTML = sorted.map(c => renderComment(c, floorMap[c.id], allReplies.filter(r => r.parent_id === c.id))).join('');
 }
-function renderComment(c){
+
+function renderComment(c, floor, replies){
   const author = c.author || {};
   const name = escapeHtml(author.nickname || author.username || '神秘用户');
-  const uid = author.uid ? `<span class="comment-uid">UID ${author.uid}</span>` : '';
+  const uid = (author.uid != null) ? `<span class="comment-uid">UID ${author.uid}</span>` : '';
   const role = author.role === 'owner' ? '<span class="role-badge role-owner">站长</span>' :
                author.role === 'admin' ? '<span class="role-badge role-admin">管理员</span>' : '';
-  const time = new Date(c.created_at).toLocaleString('zh-CN', { hour12:false });
+  const time = fmtTime(c.created_at);
   const img = c.image_url ? `<div><img class="comment-img" src="${c.image_url}" alt="评论照片" onclick="window.open('${c.image_url}')"></div>` : '';
   const canDel = currentUser && (
     currentProfile.role === 'owner' ||
     currentProfile.role === 'admin' ||
     currentUser.id === c.author_id
   );
+  const liked = likedSet.has(c.id);
+  const likeBtn = `<button class="btn btn-ghost btn-small like-btn${liked ? ' liked' : ''}" onclick="toggleLike('${c.id}')">${liked ? '❤️' : '🤍'} ${c.like_count || 0}</button>`;
+  const replyBtn = `<button class="btn btn-ghost btn-small" onclick="startReply('${c.id}')">回复</button>`;
   const delBtn = canDel ? `<button class="btn btn-bad btn-small" onclick="deleteComment('${c.id}')">删除</button>` : '';
   const avatarUrl = author.avatar_url || DEFAULT_AVATAR;
+  const repliesHtml = renderReplies(c, replies);
   return `
-  <div class="comment-item">
+  <div class="comment-item" data-id="${c.id}">
     <div class="comment-avatar"><img src="${escapeHtml(avatarUrl)}" alt="" loading="lazy" onerror="this.onerror=null;this.src='${DEFAULT_AVATAR}'"></div>
     <div class="comment-body">
       <div class="comment-meta">
         <span class="comment-name">${name}</span>${role}${uid}
-        <span class="comment-time">${time}</span>
       </div>
       <div class="comment-content">${c.content || '<i style="color:#999">[图片评论]</i>'}</div>
       ${img}
-      <div class="comment-actions">${delBtn}</div>
+      <div class="comment-foot">
+        <span class="comment-time">${time}</span>
+        <span class="comment-floor">${floor}楼</span>
+      </div>
+      <div class="comment-actions">${likeBtn}${replyBtn}${delBtn}</div>
+      ${repliesHtml}
     </div>
   </div>`;
 }
+
+function renderReplies(root, replies){
+  if(!replies || !replies.length) return '';
+  const collapsed = replies.length > REPLIES_COLLAPSE;
+  const shown = collapsed ? replies.slice(0, REPLIES_COLLAPSE) : replies;
+  const hiddenCount = replies.length - shown.length;
+  const items = shown.map(r => renderReply(r, root)).join('');
+  const expandBtn = collapsed
+    ? `<div class="expand-replies" onclick="expandReplies('${root.id}')">展开剩余 ${hiddenCount} 条回复 ▾</div>`
+    : '';
+  return `<div class="replies" id="replies-${root.id}">${items}${expandBtn}</div>`;
+}
+
+function renderReply(r, root){
+  const author = r.author || {};
+  const name = escapeHtml(author.nickname || author.username || '神秘用户');
+  const uid = (author.uid != null) ? `<span class="comment-uid">UID ${author.uid}</span>` : '';
+  const role = author.role === 'owner' ? '<span class="role-badge role-owner">站长</span>' :
+               author.role === 'admin' ? '<span class="role-badge role-admin">管理员</span>' : '';
+  const time = fmtTime(r.created_at);
+  const img = r.image_url ? `<div><img class="comment-img" src="${r.image_url}" alt="评论照片" onclick="window.open('${r.image_url}')"></div>` : '';
+  const replyPrefix = r.reply_to ? `<span class="reply-to">回复 <b>${escapeHtml(r.reply_to)}</b>：</span>` : '';
+  const canDel = currentUser && (
+    currentProfile.role === 'owner' ||
+    currentProfile.role === 'admin' ||
+    currentUser.id === r.author_id ||
+    currentUser.id === root.author_id   // 楼主可删自己楼内的二级评论
+  );
+  const liked = likedSet.has(r.id);
+  const likeBtn = `<button class="btn btn-ghost btn-small like-btn${liked ? ' liked' : ''}" onclick="toggleLike('${r.id}')">${liked ? '❤️' : '🤍'} ${r.like_count || 0}</button>`;
+  const replyBtn = `<button class="btn btn-ghost btn-small" onclick="startReply('${r.id}')">回复</button>`;
+  const delBtn = canDel ? `<button class="btn btn-bad btn-small" onclick="deleteComment('${r.id}')">删除</button>` : '';
+  const avatarUrl = author.avatar_url || DEFAULT_AVATAR;
+  return `
+  <div class="reply-item" data-id="${r.id}">
+    <div class="comment-avatar small"><img src="${escapeHtml(avatarUrl)}" alt="" loading="lazy" onerror="this.onerror=null;this.src='${DEFAULT_AVATAR}'"></div>
+    <div class="comment-body">
+      <div class="comment-meta">
+        <span class="comment-name">${name}</span>${role}${uid}
+      </div>
+      <div class="comment-content">${replyPrefix}${r.content || '<i style="color:#999">[图片评论]</i>'}</div>
+      ${img}
+      <div class="comment-foot"><span class="comment-time">${time}</span></div>
+      <div class="comment-actions">${likeBtn}${replyBtn}${delBtn}</div>
+    </div>
+  </div>`;
+}
+
+function expandReplies(rootId){
+  const root = allComments.find(c => c.id === rootId);
+  if(!root) return;
+  const replies = allReplies.filter(r => r.parent_id === rootId);
+  const container = document.getElementById('replies-' + rootId);
+  container.innerHTML = replies.map(r => renderReply(r, root)).join('');
+}
+
+async function toggleLike(commentId){
+  if(!currentUser){ alert('请先登录喵'); return; }
+  if(likedSet.has(commentId)){
+    const { error } = await supabaseClient
+      .from('comment_likes').delete()
+      .eq('comment_id', commentId).eq('user_id', currentUser.id);
+    if(error){ alert('取消点赞失败：' + zhErr(error.message)); return; }
+    likedSet.delete(commentId);
+  } else {
+    const { error } = await supabaseClient
+      .from('comment_likes').insert({ comment_id: commentId, user_id: currentUser.id });
+    if(error){ alert('点赞失败：' + zhErr(error.message)); return; }
+    likedSet.add(commentId);
+  }
+  await loadComments(true);
+}
+
 async function deleteComment(id){
-  if(!confirm('确定删除这条评论吗喵？')) return;
+  if(!confirm('确定删除这条评论吗喵？删除后其下的回复也会一并删除喵。')) return;
   const { error } = await supabaseClient.from('comments').delete().eq('id', id);
   if(error){ alert('删除失败：' + zhErr(error.message)); return; }
   await loadComments(true);
