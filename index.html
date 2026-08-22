@@ -390,6 +390,10 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
         </div>
         <input type="file" id="accAvatarInput" accept="image/*" style="display:none" onchange="handleAvatar(event)">
         <h2 style="font-size:20px;color:var(--ink-600)">账号管理</h2>
+        <div style="display:flex;gap:8px;margin-top:10px;justify-content:center">
+          <button class="btn btn-ghost btn-small" onclick="openMyProfile()" title="看看别人眼中你的主页和评论">👀 访客视角</button>
+          <button class="btn btn-ghost btn-small" id="myViewBtn" title="当前处于我的视角（账号管理）" disabled style="opacity:.6;cursor:default">🙋 我的视角</button>
+        </div>
       </div>
       <div class="acc-msg" id="accMsg"></div>
       <div class="acc-info" id="accInfoCard" style="display:none">
@@ -471,6 +475,9 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
   <div class="view" id="viewProfile">
     <div class="card">
       <div class="profile-head">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:8px;width:100%">
+          <button class="btn btn-ghost btn-small" id="profileBackToAccount" onclick="switchView('account')" style="display:none">🙋 返回我的账号管理</button>
+        </div>
         <div class="profile-avatar"><img id="profileAvatarImg" src="assets/default-avatar.jpg" alt="头像"></div>
         <div class="profile-info">
           <h2 id="profileName">神秘用户</h2>
@@ -1687,6 +1694,11 @@ async function deleteComment(id){
 }
 
 // ========== 用户资料详情页 ==========
+// 访客视角：打开自己的资料详情页，查看别人眼中的主页与评论区
+function openMyProfile(){
+  if(!currentUser){ alert('请先登录喵'); return; }
+  openProfile(currentUser.id);
+}
 async function openProfile(userId){
   if(!userId){ alert('该用户已注销，无法查看主页喵'); return; }
   viewingUserId = userId;
@@ -1721,6 +1733,11 @@ async function loadProfile(userId){
     return;
   }
   viewingUid = p.uid;
+  // 访客视角：当查看的是自己的主页时，显示「返回我的账号管理」按钮
+  const backBtn = document.getElementById('profileBackToAccount');
+  if(backBtn){
+    backBtn.style.display = (currentUser && currentUser.id === userId) ? '' : 'none';
+  }
   const avatarImg = document.getElementById('profileAvatarImg');
   avatarImg.onerror = function(){ this.onerror=null; this.src=DEFAULT_AVATAR; };
   avatarImg.src = p.avatar_url || DEFAULT_AVATAR;
