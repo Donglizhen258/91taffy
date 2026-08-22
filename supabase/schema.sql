@@ -25,8 +25,11 @@ create table if not exists public.profiles (
   gender text default '保密' check (gender in ('男','女','保密')),
   role text not null default 'user' check (role in ('owner','admin','user')),
   status text not null default 'active' check (status in ('active','banned')),
-  bio text default '',
+  bio text default '',                       -- 自我介绍
   avatar_url text default '',
+  birthday date,                             -- 生日（前端据此算星座）
+  qq text default '',                        -- QQ 号
+  ban_until timestamptz,                     -- 封禁截止（null=未封禁，infinity=永久）
   created_at timestamptz default now() not null
 );
 comment on table public.profiles is '用户资料，uid自增，role=owner站长/admin管理员/user普通用户，status=active正常/banned封禁';

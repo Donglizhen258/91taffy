@@ -182,6 +182,22 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
   font-size:13px;text-align:center;color:var(--ink-900);background:#fff;outline:none}
 .pager-input:focus{border-color:var(--pink-500);box-shadow:0 0 0 2px rgba(212,83,126,.2)}
 
+/* 用户资料详情页 */
+.profile-head{display:flex;gap:16px;align-items:flex-start;margin-bottom:18px}
+.profile-avatar{width:84px;height:84px;border-radius:8px;overflow:hidden;flex-shrink:0;
+  border:1px solid rgba(178,58,99,.4);box-shadow:inset 0 1px 0 rgba(255,255,255,.5),0 2px 6px rgba(178,58,99,.25)}
+.profile-avatar img{width:100%;height:100%;object-fit:cover;display:block}
+.profile-info{flex:1;min-width:0}
+.profile-info h2{font-size:20px;color:var(--ink-600);margin:0 0 6px}
+.profile-meta{font-size:13px;color:var(--ink-500);margin-bottom:8px;display:flex;flex-wrap:wrap;gap:6px 14px}
+.profile-bio{font-size:14px;color:var(--ink-900);line-height:1.7;background:rgba(255,255,255,.6);
+  border:1px solid rgba(212,83,126,.25);border-radius:6px;padding:10px 12px;word-break:break-word}
+.ban-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ban-row input{width:90px;padding:5px 8px;border:1px solid rgba(178,58,99,.4);border-radius:4px;
+  font-size:13px;color:var(--ink-900);background:#fff;outline:none}
+.ban-row input:focus{border-color:var(--pink-500);box-shadow:0 0 0 2px rgba(212,83,126,.2)}
+.profile-head .role-badge,.profile-head .uid-badge{vertical-align:middle}
+
 /* 管理面板 */
 .admin-panel{
   background:linear-gradient(180deg,rgba(255,255,255,.9),rgba(255,240,247,.8));
@@ -278,12 +294,6 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
     </div>
   </div>
 
-  <!-- 管理面板已迁到 viewAdmin 视图，这里不再内嵌 -->
-  <div class="admin-panel" id="adminPanel" style="display:none">
-    <h3 id="adminTitle">管理面板</h3>
-    <div id="adminUserList"><div class="loading">加载中喵...</div></div>
-  </div>
-
   <!-- 评论区 -->
   <div class="card">
     <div class="comments-head">
@@ -352,6 +362,30 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
       <button class="btn" style="width:100%" onclick="saveNick()">保存昵称</button>
       <hr class="acc-divider">
       <div class="acc-field">
+        <label>性别</label>
+        <select id="accGender">
+          <option value="保密">保密</option>
+          <option value="男">男</option>
+          <option value="女">女</option>
+        </select>
+      </div>
+      <div class="acc-field">
+        <label>生日</label>
+        <input id="accBirthday" type="date" onchange="updateZodiac()">
+        <div class="acc-tip">星座：<span id="accZodiac">未设置</span></div>
+      </div>
+      <div class="acc-field">
+        <label>QQ号</label>
+        <input id="accQQ" placeholder="你的QQ号" maxlength="20">
+      </div>
+      <div class="acc-field">
+        <label>自我介绍</label>
+        <textarea id="accBio" placeholder="介绍一下自己喵..." maxlength="200" style="width:100%;min-height:70px;border:1px solid rgba(178,58,99,.4);border-radius:4px;padding:10px;font-size:14px;font-family:inherit;color:var(--ink-900);background:#fff;resize:vertical;outline:none"></textarea>
+        <div class="acc-tip">会展示在你的个人主页喵</div>
+      </div>
+      <button class="btn" style="width:100%" onclick="saveProfile()">保存个人资料</button>
+      <hr class="acc-divider">
+      <div class="acc-field">
         <label>更换邮箱</label>
         <input id="accNewEmail" type="email" placeholder="新邮箱地址">
         <div class="acc-tip">更换后需要到新邮箱验证喵</div>
@@ -381,6 +415,74 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
         <h3 id="adminTitle">管理面板</h3>
         <div id="adminUserList"><div class="loading">加载中喵...</div></div>
       </div>
+    </div>
+  </div>
+  <!-- ===== 用户资料详情页视图 ===== -->
+  <div class="view" id="viewProfile">
+    <div class="card">
+      <div class="profile-head">
+        <div class="profile-avatar"><img id="profileAvatarImg" src="assets/default-avatar.jpg" alt="头像"></div>
+        <div class="profile-info">
+          <h2 id="profileName">神秘用户</h2>
+          <div id="profileBadges"></div>
+          <div class="profile-meta" id="profileMeta"></div>
+          <div class="profile-bio" id="profileBio"></div>
+        </div>
+      </div>
+      <div id="profileBanArea" style="display:none">
+        <div class="admin-panel">
+          <h3>管理操作（封禁）</h3>
+          <div class="ban-row">
+            <input id="banDays" type="number" min="1" placeholder="封禁天数">
+            <button class="btn btn-bad btn-small" onclick="banUser('days')">封禁指定天数</button>
+            <button class="btn btn-bad btn-small" onclick="banUser('forever')">永久封禁</button>
+            <button class="btn btn-ok btn-small" onclick="unbanUser()">解封</button>
+          </div>
+          <div class="sub" id="profileBanStatus"></div>
+        </div>
+      </div>
+      <hr class="acc-divider">
+      <div class="comments-head">
+        <h2>TA 的评论区</h2>
+        <span id="profileCommentCount" class="sub"></span>
+        <div class="sort-btns">
+          <button class="sort-btn active" data-sort="time_desc" onclick="setProfileSort('time_desc')">最新</button>
+          <button class="sort-btn" data-sort="time_asc" onclick="setProfileSort('time_asc')">最早</button>
+          <button class="sort-btn" data-sort="likes_desc" onclick="setProfileSort('likes_desc')">最多赞</button>
+          <button class="sort-btn" data-sort="likes_asc" onclick="setProfileSort('likes_asc')">最少赞</button>
+        </div>
+      </div>
+      <div class="comment-form" id="profileCommentForm">
+        <div class="comment-lock" id="profileCommentLock">
+          <span class="lock-icon">🔒</span>
+          <div class="lock-text">评论区已上锁，登录后才能评论喵</div>
+          <div class="auth-btns">
+            <button class="btn btn-ghost" onclick="showLogin()">登录</button>
+            <button class="btn" onclick="showRegister()">注册</button>
+          </div>
+        </div>
+        <div id="profileCommentInner" style="display:none">
+          <div id="profileReplyBar" class="reply-bar" style="display:none">
+            <span>回复 <b id="profileReplyToName"></b>：</span>
+            <button class="x" onclick="cancelProfileReply()">×</button>
+          </div>
+          <textarea id="profileCommentInput" placeholder="说点什么喵..."></textarea>
+          <div class="toolbar">
+            <button class="btn btn-ghost btn-small" onclick="toggleProfileEmoji()">表情</button>
+            <button class="btn btn-ghost btn-small" onclick="document.getElementById('profilePhotoInput').click()">照片</button>
+            <input type="file" id="profilePhotoInput" accept="image/*" style="display:none" onchange="handleProfilePhoto(event)">
+            <span id="profilePhotoStatus" class="sub" style="margin-left:auto"></span>
+            <button class="btn btn-small" onclick="submitProfileComment()">发表评论</button>
+          </div>
+          <div class="photo-preview" id="profilePhotoPreview" style="display:none">
+            <img id="profilePreviewImg" alt="照片预览">
+            <button class="x" onclick="removeProfilePhoto()">×</button>
+          </div>
+          <div class="emoji-panel" id="profileEmojiPanel"></div>
+        </div>
+      </div>
+      <div id="profileCommentList"><div class="loading">加载中喵...</div></div>
+      <div id="profileCommentPager" class="pager" style="display:none"></div>
     </div>
   </div>
 </div>
@@ -448,7 +550,8 @@ const supabaseClient = (window.supabase && window.supabase.createClient)
   : null;
 
 // ========== 页面标识（每页通用，改这个值即可换页） ==========
-const PAGE_ID = 'home';
+// home = 首页评论区；profile_<uid> = 某用户资料详情页评论区
+let PAGE_ID = 'home';
 
 // ========== 塔菲表情包（16个动态GIF，B站专栏 cv24502948 高清动态表情） ==========
 // 来源：https://www.bilibili.com/read/cv24502948（永雏塔菲QQ装扮高清动态表情包）
@@ -494,6 +597,7 @@ function switchView(name){
   const home = document.getElementById('viewHome');
   const acc = document.getElementById('viewAccount');
   const admin = document.getElementById('viewAdmin');
+  const profile = document.getElementById('viewProfile');
   const navHome = document.getElementById('navHome');
   const navAcc = document.getElementById('navAccount');
   const navAdmin = document.getElementById('navAdmin');
@@ -501,21 +605,28 @@ function switchView(name){
   home.classList.remove('show');
   acc.classList.remove('show');
   if(admin) admin.classList.remove('show');
+  if(profile) profile.classList.remove('show');
   navHome.classList.remove('active');
   navAcc.classList.remove('active');
   if(navAdmin) navAdmin.classList.remove('active');
   if(name === 'home'){
+    PAGE_ID = 'home';
+    ACTIVE = 'home';
     home.classList.add('show');
     navHome.classList.add('active');
     // 回到首页刷新评论
     if(typeof loadComments === 'function') loadComments(true);
   } else if(name === 'account'){
+    PAGE_ID = 'home';
+    ACTIVE = 'home';
     acc.classList.add('show');
     navAcc.classList.add('active');
     loadAccountView();
   } else if(name === 'admin'){
     // 仅站长/管理员可进入该视图
     if(currentProfile && ['owner','admin'].includes(currentProfile.role)){
+      PAGE_ID = 'home';
+      ACTIVE = 'home';
       admin.classList.add('show');
       navAdmin.classList.add('active');
       renderAdminPanel();
@@ -525,6 +636,9 @@ function switchView(name){
       navHome.classList.add('active');
       alert('该页面仅限站长/管理员访问喵');
     }
+  } else if(name === 'profile'){
+    profile.classList.add('show');
+    // 资料页从首页点头像进入，不高亮任何导航项
   }
 }
 // 点击导航区域外关闭菜单
@@ -555,6 +669,14 @@ function loadAccountView(){
   msg.textContent = '';
   // 填充当前昵称
   document.getElementById('accNick').value = currentProfile ? (currentProfile.nickname || '') : '';
+  // 填充详细资料
+  if(currentProfile){
+    document.getElementById('accGender').value = currentProfile.gender || '保密';
+    document.getElementById('accBirthday').value = currentProfile.birthday || '';
+    document.getElementById('accQQ').value = currentProfile.qq || '';
+    document.getElementById('accBio').value = currentProfile.bio || '';
+    updateZodiac();
+  }
   // 头像显示：有上传用上传图，否则用默认头像
   if(currentProfile && currentProfile.avatar_url){
     accAvatarUrl = currentProfile.avatar_url;
@@ -607,6 +729,38 @@ async function saveNick(){
   if(error){ showAccMsg('保存失败：' + zhErr(error.message), false); return; }
   if(currentProfile) currentProfile.nickname = nick;
   showAccMsg('昵称已保存喵', true);
+  renderUserBar();
+}
+function zodiacFromDate(dateStr){
+  if(!dateStr) return '';
+  const parts = dateStr.split('-').map(Number);
+  const m = parts[1], d = parts[2];
+  const zodiacs = ['摩羯座','水瓶座','双鱼座','白羊座','金牛座','双子座','巨蟹座','狮子座','处女座','天秤座','天蝎座','射手座'];
+  const ends = [20,19,21,20,21,22,23,23,23,24,23,22];
+  let idx = m - 1;
+  if(d > ends[idx]) idx = (idx + 1) % 12;
+  return zodiacs[idx];
+}
+function updateZodiac(){
+  const z = zodiacFromDate(document.getElementById('accBirthday').value);
+  document.getElementById('accZodiac').textContent = z || '未设置';
+}
+async function saveProfile(){
+  if(!currentUser){ alert('请先登录喵'); return; }
+  const gender = document.getElementById('accGender').value;
+  const birthday = document.getElementById('accBirthday').value || null;
+  const qq = document.getElementById('accQQ').value.trim();
+  const bio = document.getElementById('accBio').value.trim();
+  const { error } = await supabaseClient.from('profiles').update({ gender, birthday, qq, bio }).eq('id', currentUser.id);
+  if(error){ showAccMsg('保存失败：' + zhErr(error.message), false); return; }
+  if(currentProfile){
+    currentProfile.gender = gender;
+    currentProfile.birthday = birthday;
+    currentProfile.qq = qq;
+    currentProfile.bio = bio;
+  }
+  updateZodiac();
+  showAccMsg('个人资料已保存喵', true);
   renderUserBar();
 }
 async function saveEmail(){
@@ -703,6 +857,26 @@ async function loadSession(){
       currentProfile = data;
     }catch(e){
       console.error('读取用户资料失败', e);
+    }
+    // 被封禁用户（即使已持有会话）也强制登出
+    if(currentProfile && currentProfile.status === 'banned'){
+      let banMsg = '你已被封禁喵';
+      if(currentProfile.ban_until){
+        const remain = new Date(currentProfile.ban_until).getTime() - Date.now();
+        const days = Math.ceil(remain / 86400000);
+        if(days > 36500){ banMsg = '你已被封禁，剩余封禁天数：永久喵'; }
+        else if(days > 0){ banMsg = `你已被封禁，剩余封禁天数：${days} 天喵`; }
+      }
+      try{ await supabaseClient.auth.signOut(); }catch(e){}
+      currentUser = null;
+      currentProfile = null;
+      document.getElementById('userInfo').textContent = '未登录';
+      document.getElementById('userActions').innerHTML =
+        `<button class="btn btn-ghost btn-small" onclick="showLogin()">登录</button>
+         <button class="btn btn-small" onclick="showRegister()">注册</button>`;
+      alert(banMsg);
+      setCommentLocked(true);
+      return;
     }
     renderUserBar();
     // 已登录：根据角色决定是否显示「网站管理」菜单
@@ -810,8 +984,16 @@ async function doLogin(){
   currentUser = data.user;
   const { data: prof } = await supabaseClient.from('profiles').select('*').eq('id', data.user.id).single();
   if(prof && prof.status === 'banned'){
-    err.textContent = '该账号已被封禁喵';
+    let banMsg = '你已被封禁喵';
+    if(prof.ban_until){
+      const remain = new Date(prof.ban_until).getTime() - Date.now();
+      const days = Math.ceil(remain / 86400000);
+      if(days > 36500){ banMsg = '你已被封禁，剩余封禁天数：永久喵'; }
+      else if(days > 0){ banMsg = `你已被封禁，剩余封禁天数：${days} 天喵`; }
+    }
+    err.textContent = banMsg;
     await supabaseClient.auth.signOut();
+    currentUser = null;
     return;
   }
   currentProfile = prof;
@@ -826,7 +1008,11 @@ async function doLogin(){
     if(navAdmin) navAdmin.style.display = 'none';
   }
   setCommentLocked(false); // 登录成功，解锁评论区
-  await loadComments(true);
+  if(ACTIVE === 'profile' && viewingUserId){
+    await loadProfile(viewingUserId); // 资料页登录：刷新资料与封禁区
+  } else {
+    await loadComments(true);
+  }
 }
 async function doLogout(){
   try{ await supabaseClient.auth.signOut(); }catch(e){ console.error(e); }
@@ -841,7 +1027,11 @@ async function doLogout(){
   document.getElementById('commentInput').placeholder = '登录后即可评论喵...';
   document.getElementById('commentInput').disabled = true;
   setCommentLocked(true); // 退出后重新上锁
-  await loadComments(true);
+  if(ACTIVE === 'profile' && viewingUserId){
+    await loadProfile(viewingUserId); // 资料页退出：刷新资料与封禁区
+  } else {
+    await loadComments(true);
+  }
 }
 
 // ========== 照片压缩上传 ==========
@@ -897,9 +1087,24 @@ let sortMode = 'time_desc'; // time_desc / time_asc / likes_desc / likes_asc
 let replyTo = null;         // { id, name } 正在回复的评论
 let allComments = [];       // 当前页所有一级评论（时间正序）
 let allReplies = [];        // 当前页所有二级评论（时间正序）
-let likedSet = new Set();   // 当前用户点赞过的评论 id
+let likedSet = new Set();   // 当前用户点赞过的评论 id（comment_id 全局唯一，首页/资料页共享）
 let currentPage = 1;        // 当前评论页码
 let totalPages = 1;         // 评论总页数
+
+// ===== 资料详情页评论状态（与首页评论独立） =====
+let ACTIVE = 'home';        // 当前显示的评论区：home / profile
+let activeComments = [];    // 当前渲染列表所用的一级评论（供展开回复使用）
+let activeReplies = [];     // 当前渲染列表所用的二级评论
+let pSortMode = 'time_desc';
+let pReplyTo = null;
+let pAllComments = [];
+let pAllReplies = [];
+let pCurrentPage = 1;
+let pTotalPages = 1;
+let pPhotoFile = null;
+let pEmojiRendered = false;
+let viewingUid = null;      // 正在查看资料的用户 uid
+let viewingUserId = null;   // 正在查看资料的用户 id (uuid)
 
 function fmtTime(iso){
   const d = new Date(iso);
@@ -914,23 +1119,37 @@ function setSort(mode){
 }
 function startReply(id){
   if(!currentUser){ alert('请先登录喵'); return; }
-  const c = allComments.find(x => x.id === id) || allReplies.find(x => x.id === id);
+  const c = activeComments.find(x => x.id === id) || activeReplies.find(x => x.id === id);
   const a = (c && c.author) || {};
-  replyTo = { id, name: a.nickname || a.username || '神秘用户' };
-  document.getElementById('replyToName').textContent = replyTo.name;
-  document.getElementById('replyBar').style.display = 'flex';
-  const ta = document.getElementById('commentInput');
-  ta.focus();
-  ta.scrollIntoView({ behavior:'smooth', block:'center' });
+  const name = a.nickname || a.username || '神秘用户';
+  if(ACTIVE === 'home'){
+    replyTo = { id, name };
+    document.getElementById('replyToName').textContent = name;
+    document.getElementById('replyBar').style.display = 'flex';
+    const ta = document.getElementById('commentInput');
+    ta.focus();
+    ta.scrollIntoView({ behavior:'smooth', block:'center' });
+  } else {
+    pReplyTo = { id, name };
+    document.getElementById('profileReplyToName').textContent = name;
+    document.getElementById('profileReplyBar').style.display = 'flex';
+    const ta = document.getElementById('profileCommentInput');
+    ta.focus();
+    ta.scrollIntoView({ behavior:'smooth', block:'center' });
+  }
 }
 function cancelReply(){
   replyTo = null;
   document.getElementById('replyBar').style.display = 'none';
 }
+function cancelProfileReply(){
+  pReplyTo = null;
+  document.getElementById('profileReplyBar').style.display = 'none';
+}
 function resolveRootId(id){
-  if(allComments.some(c => c.id === id)) return id;  // 一级评论，根就是自己
-  const r = allReplies.find(c => c.id === id);
-  return r ? r.parent_id : id;                       // 二级评论，根是其 parent_id
+  if(activeComments.some(c => c.id === id)) return id;  // 一级评论，根就是自己
+  const r = activeReplies.find(c => c.id === id);
+  return r ? r.parent_id : id;                          // 二级评论，根是其 parent_id
 }
 
 async function submitComment(){
@@ -1036,6 +1255,8 @@ function renderCommentList(){
   if(currentPage < 1) currentPage = 1;
   const start = (currentPage - 1) * PAGE_SIZE;
   const pageItems = sorted.slice(start, start + PAGE_SIZE);
+  activeComments = allComments;
+  activeReplies = allReplies;
   list.innerHTML = pageItems.map(c => renderComment(c, floorMap[c.id], allReplies.filter(r => r.parent_id === c.id))).join('');
   renderPager();
 }
@@ -1091,9 +1312,10 @@ function renderComment(c, floor, replies){
   const delBtn = canDel ? `<button class="btn btn-bad btn-small" onclick="deleteComment('${c.id}')">删除</button>` : '';
   const avatarUrl = author.avatar_url || DEFAULT_AVATAR;
   const repliesHtml = renderReplies(c, replies);
+  const dbl = c.author_id ? ` ondblclick="openProfile('${c.author_id}')" title="双击查看TA的主页"` : '';
   return `
   <div class="comment-item" data-id="${c.id}">
-    <div class="comment-avatar"><img src="${escapeHtml(avatarUrl)}" alt="" loading="lazy" onerror="this.onerror=null;this.src='${DEFAULT_AVATAR}'"></div>
+    <div class="comment-avatar"><img src="${escapeHtml(avatarUrl)}" alt="" loading="lazy"${dbl} onerror="this.onerror=null;this.src='${DEFAULT_AVATAR}'"></div>
     <div class="comment-body">
       <div class="comment-meta">
         <span class="comment-name">${name}</span>${role}${uid}
@@ -1142,9 +1364,10 @@ function renderReply(r, root){
   const replyBtn = `<button class="btn btn-ghost btn-small" onclick="startReply('${r.id}')">回复</button>`;
   const delBtn = canDel ? `<button class="btn btn-bad btn-small" onclick="deleteComment('${r.id}')">删除</button>` : '';
   const avatarUrl = author.avatar_url || DEFAULT_AVATAR;
+  const dbl = r.author_id ? ` ondblclick="openProfile('${r.author_id}')" title="双击查看TA的主页"` : '';
   return `
   <div class="reply-item" data-id="${r.id}">
-    <div class="comment-avatar small"><img src="${escapeHtml(avatarUrl)}" alt="" loading="lazy" onerror="this.onerror=null;this.src='${DEFAULT_AVATAR}'"></div>
+    <div class="comment-avatar small"><img src="${escapeHtml(avatarUrl)}" alt="" loading="lazy"${dbl} onerror="this.onerror=null;this.src='${DEFAULT_AVATAR}'"></div>
     <div class="comment-body">
       <div class="comment-meta">
         <span class="comment-name">${name}</span>${role}${uid}
@@ -1158,9 +1381,9 @@ function renderReply(r, root){
 }
 
 function expandReplies(rootId){
-  const root = allComments.find(c => c.id === rootId);
+  const root = activeComments.find(c => c.id === rootId);
   if(!root) return;
-  const replies = allReplies.filter(r => r.parent_id === rootId);
+  const replies = activeReplies.filter(r => r.parent_id === rootId);
   const container = document.getElementById('replies-' + rootId);
   container.innerHTML = replies.map(r => renderReply(r, root)).join('');
 }
@@ -1179,14 +1402,290 @@ async function toggleLike(commentId){
     if(error){ alert('点赞失败：' + zhErr(error.message)); return; }
     likedSet.add(commentId);
   }
-  await loadComments(false);
+  if(ACTIVE === 'home') await loadComments(false);
+  else await loadProfileComments(false);
 }
 
 async function deleteComment(id){
   if(!confirm('确定删除这条评论吗喵？删除后其下的回复也会一并删除喵。')) return;
   const { error } = await supabaseClient.from('comments').delete().eq('id', id);
   if(error){ alert('删除失败：' + zhErr(error.message)); return; }
-  await loadComments(false);
+  if(ACTIVE === 'home') await loadComments(false);
+  else await loadProfileComments(false);
+}
+
+// ========== 用户资料详情页 ==========
+async function openProfile(userId){
+  if(!userId){ alert('该用户已注销，无法查看主页喵'); return; }
+  viewingUserId = userId;
+  PAGE_ID = 'profile_' + userId;
+  ACTIVE = 'profile';
+  switchView('profile');
+  await loadProfile(userId);
+}
+function banStatusText(p){
+  if(p.status === 'banned'){
+    if(p.ban_until){
+      const remain = new Date(p.ban_until).getTime() - Date.now();
+      const days = Math.ceil(remain / 86400000);
+      if(days > 36500) return '当前状态：已永久封禁';
+      if(days > 0) return `当前状态：封禁中，剩余 ${days} 天`;
+    }
+    return '当前状态：已封禁';
+  }
+  return '当前状态：正常';
+}
+async function loadProfile(userId){
+  const { data: p, error } = await supabaseClient.from('profiles')
+    .select('id,uid,nickname,username,gender,role,status,bio,avatar_url,birthday,qq,ban_until,created_at')
+    .eq('id', userId).single();
+  if(error || !p){
+    document.getElementById('profileName').textContent = '用户不存在';
+    document.getElementById('profileBadges').innerHTML = '';
+    document.getElementById('profileMeta').textContent = '';
+    document.getElementById('profileBio').textContent = '';
+    document.getElementById('profileAvatarImg').src = DEFAULT_AVATAR;
+    document.getElementById('profileBanArea').style.display = 'none';
+    return;
+  }
+  viewingUid = p.uid;
+  const avatarImg = document.getElementById('profileAvatarImg');
+  avatarImg.onerror = function(){ this.onerror=null; this.src=DEFAULT_AVATAR; };
+  avatarImg.src = p.avatar_url || DEFAULT_AVATAR;
+  document.getElementById('profileName').textContent = p.nickname || p.username || '神秘用户';
+  let badges = `<span class="uid-badge">UID ${p.uid}</span>`;
+  if(p.role === 'owner') badges += ' <span class="role-badge role-owner">站长</span>';
+  else if(p.role === 'admin') badges += ' <span class="role-badge role-admin">管理员</span>';
+  document.getElementById('profileBadges').innerHTML = badges;
+  const zodiac = zodiacFromDate(p.birthday || '');
+  const metaParts = [];
+  if(p.gender && p.gender !== '保密') metaParts.push(`性别：${p.gender}`);
+  if(p.birthday) metaParts.push(`生日：${p.birthday}`);
+  if(zodiac) metaParts.push(`星座：${zodiac}`);
+  if(p.qq) metaParts.push(`QQ：${escapeHtml(p.qq)}`);
+  metaParts.push(`加入：${new Date(p.created_at).toLocaleDateString('zh-CN')}`);
+  document.getElementById('profileMeta').textContent = metaParts.join('　');
+  document.getElementById('profileBio').textContent = p.bio || '这个人很懒，什么都没写喵~';
+  // 封禁区：站长/管理员可封禁他人（不能封禁自己、不能封禁站长）
+  const banArea = document.getElementById('profileBanArea');
+  const canManage = currentProfile && ['owner','admin'].includes(currentProfile.role) && currentUser.id !== userId && p.role !== 'owner';
+  if(canManage){
+    banArea.style.display = 'block';
+    document.getElementById('profileBanStatus').textContent = banStatusText(p);
+  } else {
+    banArea.style.display = 'none';
+  }
+  // 评论表单锁定
+  setProfileCommentLocked(!currentUser);
+  if(currentUser){
+    document.getElementById('profileCommentInput').placeholder = `以 ${escapeHtml(currentProfile.nickname||currentProfile.username)} 的身份评论喵...`;
+  }
+  await loadProfileComments(true);
+}
+function setProfileCommentLocked(locked){
+  const form = document.getElementById('profileCommentForm');
+  const inner = document.getElementById('profileCommentInner');
+  const lock = document.getElementById('profileCommentLock');
+  if(locked){
+    form.classList.add('locked');
+    inner.style.display = 'none';
+    lock.style.display = 'block';
+  } else {
+    form.classList.remove('locked');
+    inner.style.display = 'block';
+    lock.style.display = 'none';
+  }
+}
+async function loadProfileComments(reset){
+  if(reset){ pCurrentPage = 1; }
+  if(!supabaseClient){
+    document.getElementById('profileCommentList').innerHTML = `<div class="empty">评论服务暂不可用，请稍后刷新喵</div>`;
+    return;
+  }
+  const { data: firsts, error: e1 } = await supabaseClient
+    .from('comments')
+    .select('*, author:profiles(id,nickname,username,uid,role,avatar_url)')
+    .eq('page_id', PAGE_ID)
+    .is('parent_id', null)
+    .order('created_at', { ascending:true });
+  if(e1){ document.getElementById('profileCommentList').innerHTML = `<div class="empty">加载失败：${zhErr(e1.message)}</div>`; return; }
+  const { data: replies } = await supabaseClient
+    .from('comments')
+    .select('*, author:profiles(id,nickname,username,uid,role,avatar_url)')
+    .eq('page_id', PAGE_ID)
+    .not('parent_id', 'is', null)
+    .order('created_at', { ascending:true });
+  pAllComments = firsts || [];
+  pAllReplies = replies || [];
+  document.getElementById('profileCommentCount').textContent = pAllComments.length ? `共 ${pAllComments.length} 条` : '';
+  renderProfileCommentList();
+}
+function renderProfileCommentList(){
+  const list = document.getElementById('profileCommentList');
+  if(!pAllComments.length){
+    list.innerHTML = `<div class="empty">还没有评论，快来抢沙发喵~</div>`;
+    document.getElementById('profileCommentPager').style.display = 'none';
+    return;
+  }
+  const chrono = [...pAllComments].sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
+  const floorMap = {};
+  chrono.forEach((c, i) => floorMap[c.id] = i + 1);
+  let sorted = [...pAllComments];
+  if(pSortMode === 'time_asc') sorted.sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
+  else if(pSortMode === 'time_desc') sorted.sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+  else if(pSortMode === 'likes_desc') sorted.sort((a,b) => (b.like_count||0)-(a.like_count||0) || (new Date(b.created_at)-new Date(a.created_at)));
+  else if(pSortMode === 'likes_asc') sorted.sort((a,b) => (a.like_count||0)-(b.like_count||0) || (new Date(a.created_at)-new Date(b.created_at)));
+  pTotalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
+  if(pCurrentPage > pTotalPages) pCurrentPage = pTotalPages;
+  if(pCurrentPage < 1) pCurrentPage = 1;
+  const start = (pCurrentPage - 1) * PAGE_SIZE;
+  const pageItems = sorted.slice(start, start + PAGE_SIZE);
+  activeComments = pAllComments;
+  activeReplies = pAllReplies;
+  list.innerHTML = pageItems.map(c => renderComment(c, floorMap[c.id], pAllReplies.filter(r => r.parent_id === c.id))).join('');
+  renderProfilePager();
+}
+function renderProfilePager(){
+  const pager = document.getElementById('profileCommentPager');
+  if(pTotalPages <= 1){ pager.style.display = 'none'; return; }
+  pager.style.display = 'flex';
+  const prevDisabled = pCurrentPage <= 1;
+  const nextDisabled = pCurrentPage >= pTotalPages;
+  pager.innerHTML = `
+    <button class="pager-btn" ${prevDisabled ? 'disabled' : ''} onclick="goProfilePage(${pCurrentPage-1})">上一页</button>
+    <span class="pager-info">第 ${pCurrentPage} / ${pTotalPages} 页</span>
+    <button class="pager-btn" ${nextDisabled ? 'disabled' : ''} onclick="goProfilePage(${pCurrentPage+1})">下一页</button>
+    <span class="pager-jump">跳转
+      <input id="profilePagerJumpInput" class="pager-input" type="number" min="1" max="${pTotalPages}" placeholder="${pCurrentPage}" onkeydown="if(event.key==='Enter')jumpProfilePage()">
+      <button class="pager-btn" onclick="jumpProfilePage()">GO</button>
+    </span>`;
+}
+function goProfilePage(n){
+  if(n < 1 || n > pTotalPages) return;
+  pCurrentPage = n;
+  renderProfileCommentList();
+}
+function jumpProfilePage(){
+  const input = document.getElementById('profilePagerJumpInput');
+  let n = parseInt(input.value, 10);
+  if(isNaN(n)){ alert('请输入正确的页码喵'); return; }
+  if(n < 1) n = 1;
+  if(n > pTotalPages) n = pTotalPages;
+  pCurrentPage = n;
+  renderProfileCommentList();
+}
+function setProfileSort(mode){
+  pSortMode = mode;
+  pCurrentPage = 1;
+  document.getElementById('viewProfile').querySelectorAll('.sort-btn').forEach(b => b.classList.toggle('active', b.dataset.sort === mode));
+  renderProfileCommentList();
+}
+async function submitProfileComment(){
+  if(!currentUser){ alert('请先登录喵'); return; }
+  const ta = document.getElementById('profileCommentInput');
+  const text = ta.value.trim();
+  if(!text && !pPhotoFile){ alert('说点什么再发喵'); return; }
+  const emojiCount = (text.match(/\[em:/g) || []).length;
+  if(emojiCount > MAX_EMOJI){ alert(`一个评论最多放 ${MAX_EMOJI} 个表情喵`); return; }
+  let imageUrl = '';
+  if(pPhotoFile){
+    const path = `comments/${currentUser.id}/${Date.now()}.jpg`;
+    const { error: upErr } = await supabaseClient.storage.from('comment-images').upload(path, pPhotoFile);
+    if(upErr){ alert('照片上传失败：' + zhErr(upErr.message)); return; }
+    const { data: { publicUrl } } = supabaseClient.storage.from('comment-images').getPublicUrl(path);
+    imageUrl = publicUrl;
+  }
+  let content = text;
+  EMOJIS.forEach(([name]) => {
+    const marker = `[em:${name}]`;
+    const repl = `<img class="emoji" src="${EMOJIS.find(e=>e[0]===name)[1]}" alt="${name}">`;
+    content = content.split(marker).join(repl);
+  });
+  let parentId = null;
+  let replyToName = '';
+  if(pReplyTo){
+    parentId = resolveRootId(pReplyTo.id);
+    replyToName = pReplyTo.name;
+  }
+  const { error } = await supabaseClient.from('comments').insert({
+    page_id: PAGE_ID,
+    author_id: currentUser.id,
+    content,
+    image_url: imageUrl,
+    parent_id: parentId,
+    reply_to: replyToName
+  });
+  if(error){ alert('评论失败：' + zhErr(error.message)); return; }
+  ta.value = '';
+  removeProfilePhoto();
+  cancelProfileReply();
+  await loadProfileComments(false);
+}
+function renderProfileEmojiPanel(){
+  if(pEmojiRendered) return;
+  pEmojiRendered = true;
+  const panel = document.getElementById('profileEmojiPanel');
+  panel.innerHTML = '';
+  EMOJIS.forEach(([name, path]) => {
+    const img = document.createElement('img');
+    img.src = path; img.alt = name; img.title = name;
+    img.loading = 'lazy';
+    img.onclick = () => insertProfileEmoji(name, path);
+    panel.appendChild(img);
+  });
+}
+function toggleProfileEmoji(){
+  renderProfileEmojiPanel();
+  document.getElementById('profileEmojiPanel').classList.toggle('show');
+}
+function insertProfileEmoji(name, path){
+  const ta = document.getElementById('profileCommentInput');
+  ta.value += `[em:${name}]`;
+  toggleProfileEmoji();
+}
+function handleProfilePhoto(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  if(!file.type.startsWith('image/')){ alert('请选择图片文件喵'); return; }
+  compressImage(file).then(blob => {
+    pPhotoFile = new File([blob], 'comment.jpg', { type: 'image/jpeg' });
+    const url = URL.createObjectURL(pPhotoFile);
+    document.getElementById('profilePreviewImg').src = url;
+    document.getElementById('profilePhotoPreview').style.display = 'inline-block';
+    document.getElementById('profilePhotoStatus').textContent = `压缩后 ${(pPhotoFile.size/1024).toFixed(0)}KB`;
+  });
+}
+function removeProfilePhoto(){
+  pPhotoFile = null;
+  document.getElementById('profilePhotoPreview').style.display = 'none';
+  document.getElementById('profilePreviewImg').src = '';
+  document.getElementById('profilePhotoStatus').textContent = '';
+  document.getElementById('profilePhotoInput').value = '';
+}
+async function banUser(type){
+  if(!viewingUserId){ alert('无目标用户喵'); return; }
+  let banUntil = null;
+  if(type === 'forever'){
+    if(!confirm('确定永久封禁该用户吗喵？')) return;
+    banUntil = '9999-12-31T23:59:59Z';
+  } else {
+    const days = parseInt(document.getElementById('banDays').value, 10);
+    if(isNaN(days) || days < 1){ alert('请输入正确的封禁天数喵'); return; }
+    if(!confirm(`确定封禁该用户 ${days} 天吗喵？`)) return;
+    banUntil = new Date(Date.now() + days*86400000).toISOString();
+  }
+  const { error } = await supabaseClient.from('profiles').update({ status:'banned', ban_until: banUntil }).eq('id', viewingUserId);
+  if(error){ alert('封禁失败：' + zhErr(error.message)); return; }
+  alert('封禁成功喵');
+  await loadProfile(viewingUserId);
+}
+async function unbanUser(){
+  if(!viewingUserId){ alert('无目标用户喵'); return; }
+  if(!confirm('确定解封该用户吗喵？')) return;
+  const { error } = await supabaseClient.from('profiles').update({ status:'active', ban_until: null }).eq('id', viewingUserId);
+  if(error){ alert('解封失败：' + zhErr(error.message)); return; }
+  alert('已解封喵');
+  await loadProfile(viewingUserId);
 }
 
 // ========== 管理面板（站长/管理员） ==========
@@ -1239,8 +1738,11 @@ async function setRole(userId, role){
   renderAdminPanel();
 }
 async function setStatus(userId, status){
-  if(!confirm('确定要' + (status==='banned'?'封禁':'解封') + '该用户吗喵？')) return;
-  const { error } = await supabaseClient.from('profiles').update({ status }).eq('id', userId);
+  if(!confirm('确定要' + (status==='banned'?'永久封禁':'解封') + '该用户吗喵？')) return;
+  const patch = status === 'banned'
+    ? { status:'banned', ban_until:'9999-12-31T23:59:59Z' }
+    : { status:'active', ban_until:null };
+  const { error } = await supabaseClient.from('profiles').update(patch).eq('id', userId);
   if(error){ alert('操作失败：' + zhErr(error.message)); return; }
   renderAdminPanel();
 }
