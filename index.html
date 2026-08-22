@@ -457,6 +457,14 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
         <h3 id="adminTitle">管理面板</h3>
         <div id="adminUserList"><div class="loading">加载中喵...</div></div>
       </div>
+      <!-- 已删除 uid 冻结/回调区（站长可见） -->
+      <div class="admin-panel" id="deletedUidPanel" style="display:none">
+        <h3>已删除 UID 列表（冻结/回调）</h3>
+        <div style="font-size:12px;color:var(--ink-400);margin-bottom:10px">
+          删除用户后其 uid 进入冻结池；点「回调」放回注册池，新用户注册时优先拿到。冻结中的 uid 不会被新用户占用喵。
+        </div>
+        <div id="deletedUidList"><div class="loading">加载中喵...</div></div>
+      </div>
     </div>
   </div>
   <!-- ===== 用户资料详情页视图 ===== -->
@@ -1422,7 +1430,7 @@ async function loadComments(reset){
   // 1. 一级评论（时间正序，用于定楼层）
   const { data: firsts, error: e1 } = await supabaseClient
     .from('comments')
-    .select('*, author:profiles!comments_author_id_fkey(id,nickname,username,uid,role,avatar_url)')
+    .select('*, author_uid, author:profiles!comments_author_id_fkey(id,nickname,username,uid,role,avatar_url)')
     .eq('page_id', PAGE_ID)
     .is('parent_id', null)
     .order('created_at', { ascending:true });
@@ -1430,7 +1438,7 @@ async function loadComments(reset){
   // 2. 二级评论（时间正序）
   const { data: replies, error: e2 } = await supabaseClient
     .from('comments')
-    .select('*, author:profiles!comments_author_id_fkey(id,nickname,username,uid,role,avatar_url)')
+    .select('*, author_uid, author:profiles!comments_author_id_fkey(id,nickname,username,uid,role,avatar_url)')
     .eq('page_id', PAGE_ID)
     .not('parent_id', 'is', null)
     .order('created_at', { ascending:true });
@@ -1511,8 +1519,15 @@ function jumpPage(){
 
 function renderComment(c, floor, replies){
   const author = c.author || {};
-  const name = escapeHtml(author.nickname || author.username || '神秘用户');
-  const uid = (author.uid != null) ? `<span class="comment-uid">UID ${author.uid}</span>` : '';
+  // 作者资料还在：正常显示昵称/uid
+  // 作者已被删除（author 为空）：用评论里快照的 author_uid 显示原 uid，昵称固定"神秘用户"，头像不跳转
+  const ghosted = !c.author_id || !author.id;
+  const name = ghosted ? '神秘用户' : escapeHtml(author.nickname || author.username || '神秘用户');
+  const uid = (author.uid != null)
+    ? `<span class="comment-uid">UID ${author.uid}</span>`
+    : (ghosted && c.author_uid != null)
+      ? `<span class="comment-uid">UID ${c.author_uid}</span>`
+      : '';
   const role = author.role === 'owner' ? '<span class="role-badge role-owner">站长</span>' :
                author.role === 'admin' ? '<span class="role-badge role-admin">管理员</span>' : '';
   const time = fmtTime(c.created_at);
@@ -1528,7 +1543,8 @@ function renderComment(c, floor, replies){
   const delBtn = canDel ? `<button class="btn btn-bad btn-small" onclick="deleteComment('${c.id}')">删除</button>` : '';
   const avatarUrl = author.avatar_url || DEFAULT_AVATAR;
   const repliesHtml = renderReplies(c, replies);
-  const dbl = c.author_id ? ` ondblclick="openProfile('${c.author_id}')" title="双击查看TA的主页"` : '';
+  // 作者已删：头像不跳转；作者仍在：双击跳转主页
+  const dbl = (!ghosted && c.author_id) ? ` ondblclick="openProfile('${c.author_id}')" title="双击查看TA的主页"` : '';
   return `
   <div class="comment-item" data-id="${c.id}">
     <div class="comment-avatar"><img src="${escapeHtml(avatarUrl)}" alt="" loading="lazy"${dbl} onerror="this.onerror=null;this.src='${DEFAULT_AVATAR}'"></div>
@@ -1562,8 +1578,13 @@ function renderReplies(root, replies){
 
 function renderReply(r, root){
   const author = r.author || {};
-  const name = escapeHtml(author.nickname || author.username || '神秘用户');
-  const uid = (author.uid != null) ? `<span class="comment-uid">UID ${author.uid}</span>` : '';
+  const ghosted = !r.author_id || !author.id;
+  const name = ghosted ? '神秘用户' : escapeHtml(author.nickname || author.username || '神秘用户');
+  const uid = (author.uid != null)
+    ? `<span class="comment-uid">UID ${author.uid}</span>`
+    : (ghosted && r.author_uid != null)
+      ? `<span class="comment-uid">UID ${r.author_uid}</span>`
+      : '';
   const role = author.role === 'owner' ? '<span class="role-badge role-owner">站长</span>' :
                author.role === 'admin' ? '<span class="role-badge role-admin">管理员</span>' : '';
   const time = fmtTime(r.created_at);
@@ -1580,7 +1601,7 @@ function renderReply(r, root){
   const replyBtn = `<button class="btn btn-ghost btn-small" onclick="startReply('${r.id}')">回复</button>`;
   const delBtn = canDel ? `<button class="btn btn-bad btn-small" onclick="deleteComment('${r.id}')">删除</button>` : '';
   const avatarUrl = author.avatar_url || DEFAULT_AVATAR;
-  const dbl = r.author_id ? ` ondblclick="openProfile('${r.author_id}')" title="双击查看TA的主页"` : '';
+  const dbl = (!ghosted && r.author_id) ? ` ondblclick="openProfile('${r.author_id}')" title="双击查看TA的主页"` : '';
   return `
   <div class="reply-item" data-id="${r.id}">
     <div class="comment-avatar small"><img src="${escapeHtml(avatarUrl)}" alt="" loading="lazy"${dbl} onerror="this.onerror=null;this.src='${DEFAULT_AVATAR}'"></div>
@@ -1720,14 +1741,14 @@ async function loadProfileComments(reset){
   }
   const { data: firsts, error: e1 } = await supabaseClient
     .from('comments')
-    .select('*, author:profiles!comments_author_id_fkey(id,nickname,username,uid,role,avatar_url)')
+    .select('*, author_uid, author:profiles!comments_author_id_fkey(id,nickname,username,uid,role,avatar_url)')
     .eq('page_id', PAGE_ID)
     .is('parent_id', null)
     .order('created_at', { ascending:true });
   if(e1){ document.getElementById('profileCommentList').innerHTML = `<div class="empty">加载失败：${zhErr(e1.message)}</div>`; return; }
   const { data: replies } = await supabaseClient
     .from('comments')
-    .select('*, author:profiles!comments_author_id_fkey(id,nickname,username,uid,role,avatar_url)')
+    .select('*, author_uid, author:profiles!comments_author_id_fkey(id,nickname,username,uid,role,avatar_url)')
     .eq('page_id', PAGE_ID)
     .not('parent_id', 'is', null)
     .order('created_at', { ascending:true });
@@ -1964,6 +1985,47 @@ async function renderAdminPanel(){
       <span style="display:flex;gap:6px;flex-wrap:wrap">${btns}</span>
     </div>`;
   }).join('');
+  // 站长可见「已删除 uid 列表」，管理员也可查看
+  renderDeletedUids();
+}
+// ========== 已删除 uid 冻结/回调列表 ==========
+async function renderDeletedUids(){
+  const panel = document.getElementById('deletedUidPanel');
+  if(!panel) return;
+  panel.style.display = 'block';
+  const list = document.getElementById('deletedUidList');
+  let { data, error } = await supabaseClient.rpc('admin_list_deleted_uids');
+  if(error || !data){
+    // RPC 未部署（迁移没跑）：隐藏区块并提示
+    panel.style.display = 'none';
+    return;
+  }
+  if(!data.length){
+    list.innerHTML = '<div class="empty">暂无已删除的 uid 喵</div>';
+    return;
+  }
+  list.innerHTML = data.map(d => {
+    const state = d.recycled
+      ? '<span style="color:var(--ok);font-weight:600">已回调（可复用）</span>'
+      : '<span style="color:var(--ink-400)">冻结中</span>';
+    const btn = d.recycled
+      ? '<button class="btn btn-ghost btn-small" disabled>已回调</button>'
+      : `<button class="btn btn-ok btn-small" onclick="recycleUid(${d.uid})">回调</button>`;
+    const note = d.note ? escapeHtml(d.note) : '-';
+    return `<div class="user-row">
+      <span class="uid-badge">UID ${d.uid}</span>
+      <span class="u-meta">原用户：${note} · ${state} · 残留评论 ${d.remaining_comments} 条 · ${new Date(d.deleted_at).toLocaleString('zh-CN')}删除</span>
+      <span style="display:flex;gap:6px">${btn}</span>
+    </div>`;
+  }).join('');
+}
+// 回调：把冻结 uid 放回注册池
+async function recycleUid(uid){
+  if(!confirm(`确定把 UID ${uid} 放回注册池吗喵？\n回调后新用户注册可优先拿到该 uid，该 uid 的历史评论痕迹（uid 显示）将被清除。`)) return;
+  const { error } = await supabaseClient.rpc('admin_recycle_uid', { target_uid: uid });
+  if(error){ alert('回调失败：' + zhErr(error.message)); return; }
+  alert(`UID ${uid} 已放回注册池喵`);
+  renderAdminPanel();
 }
 async function setRole(userId, role){
   if(!confirm('确定要' + (role==='admin'?'任命为管理员':'取消管理员') + '吗喵？')) return;
