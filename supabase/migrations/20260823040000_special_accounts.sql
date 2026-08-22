@@ -7,6 +7,7 @@
 --      + 把「站内管家」昵称改成中文（test01 保持原名）
 --   3. 权限与普通用户一致（role=user），登录可用「账号/邮箱 + 密码」。
 -- 本脚本只做 update，不直插 auth.users，不依赖 pgcrypto，幂等可重复执行。
+-- 版本说明：v2.1（2026-08-23 03:53）confirmed_at 是 generated 列不可手动赋值，只更新 email_confirmed_at。
 
 -- ============ 0. 删除之前遗留的坏函数（含 gen_salt 调用，正是报错元凶） ============
 drop function if exists public.create_or_update_auth_user(text, text, text, text);
@@ -14,9 +15,9 @@ drop function if exists public.create_or_update_auth_user(text, text, text);
 drop function if exists public.create_or_update_auth_user(text, text);
 
 -- ============ 1. 把特殊号的邮箱标记为已确认（免邮箱验证登录） ============
+-- 注意：confirmed_at 是 generated 列，不能手动赋值，只更新 email_confirmed_at 即可
 update auth.users
-set email_confirmed_at = coalesce(email_confirmed_at, now()),
-    confirmed_at      = coalesce(confirmed_at, now())
+set email_confirmed_at = coalesce(email_confirmed_at, now())
 where lower(email) in ('zhanding@91taffy.com', 'test01@91taffy.com');
 
 -- ============ 2. 把「站内管家」昵称改成中文 ============
