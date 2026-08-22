@@ -170,6 +170,17 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
 .reply-to{color:var(--ink-500);font-size:13px}
 .expand-replies{margin-top:6px;font-size:12px;color:var(--pink-500);cursor:pointer;user-select:none}
 .expand-replies:hover{text-decoration:underline}
+/* 评论分页 */
+.pager{display:flex;align-items:center;justify-content:center;gap:10px;margin-top:14px;flex-wrap:wrap}
+.pager-btn{padding:4px 12px;font-size:13px;border:1px solid rgba(212,83,126,.4);border-radius:4px;
+  background:rgba(255,255,255,.65);color:var(--ink-600);cursor:pointer;transition:.15s}
+.pager-btn:hover:not(:disabled){background:linear-gradient(180deg,#f8cfdd,#e39eb8);color:#fff;border-color:rgba(178,58,99,.5)}
+.pager-btn:disabled{opacity:.45;cursor:not-allowed}
+.pager-info{font-size:13px;color:var(--ink-600);font-weight:600}
+.pager-jump{display:flex;align-items:center;gap:5px;font-size:13px;color:var(--ink-500)}
+.pager-input{width:52px;padding:3px 6px;border:1px solid rgba(178,58,99,.4);border-radius:4px;
+  font-size:13px;text-align:center;color:var(--ink-900);background:#fff;outline:none}
+.pager-input:focus{border-color:var(--pink-500);box-shadow:0 0 0 2px rgba(212,83,126,.2)}
 
 /* 管理面板 */
 .admin-panel{
@@ -317,6 +328,7 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
       </div>
     </div>
     <div id="commentList"><div class="loading">加载中喵...</div></div>
+    <div id="commentPager" class="pager" style="display:none"></div>
   </div>
 
   <div class="footer">© 2026 91taffy.com · 塔菲的小窝</div>
@@ -880,11 +892,14 @@ function removePhoto(){
 // ========== 评论 ==========
 const MAX_EMOJI = 25;       // 一个评论最多 25 个表情
 const REPLIES_COLLAPSE = 3; // 一级评论下超过 3 条二级评论折叠
+const PAGE_SIZE = 10;       // 一页最多 10 条一级评论
 let sortMode = 'time_desc'; // time_desc / time_asc / likes_desc / likes_asc
 let replyTo = null;         // { id, name } 正在回复的评论
 let allComments = [];       // 当前页所有一级评论（时间正序）
 let allReplies = [];        // 当前页所有二级评论（时间正序）
 let likedSet = new Set();   // 当前用户点赞过的评论 id
+let currentPage = 1;        // 当前评论页码
+let totalPages = 1;         // 评论总页数
 
 function fmtTime(iso){
   const d = new Date(iso);
@@ -893,6 +908,7 @@ function fmtTime(iso){
 }
 function setSort(mode){
   sortMode = mode;
+  currentPage = 1; // 切换排序回到第一页
   document.querySelectorAll('.sort-btn').forEach(b => b.classList.toggle('active', b.dataset.sort === mode));
   renderCommentList();
 }
@@ -959,10 +975,11 @@ async function submitComment(){
   ta.value = '';
   removePhoto();
   cancelReply();
-  await loadComments(true);
+  await loadComments(false);
 }
 
 async function loadComments(reset){
+  if(reset){ currentPage = 1; }
   if(!supabaseClient){
     document.getElementById('commentList').innerHTML = `<div class="empty">评论服务暂不可用，请稍后刷新喵</div>`;
     return;
@@ -1000,19 +1017,59 @@ function renderCommentList(){
   const list = document.getElementById('commentList');
   if(!allComments.length){
     list.innerHTML = `<div class="empty">还没有评论，快来抢沙发喵~</div>`;
+    document.getElementById('commentPager').style.display = 'none';
     return;
   }
-  // 楼层：按时间正序（最早=1楼）
+  // 楼层：按时间正序（最早=1楼），全量计算保证翻页后楼层号连贯
   const chrono = [...allComments].sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
   const floorMap = {};
   chrono.forEach((c, i) => floorMap[c.id] = i + 1);
-  // 显示排序
+  // 显示排序（全量排序后再分页）
   let sorted = [...allComments];
   if(sortMode === 'time_asc') sorted.sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
   else if(sortMode === 'time_desc') sorted.sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
   else if(sortMode === 'likes_desc') sorted.sort((a,b) => (b.like_count||0) - (a.like_count||0) || (new Date(b.created_at) - new Date(a.created_at)));
   else if(sortMode === 'likes_asc') sorted.sort((a,b) => (a.like_count||0) - (b.like_count||0) || (new Date(a.created_at) - new Date(b.created_at)));
-  list.innerHTML = sorted.map(c => renderComment(c, floorMap[c.id], allReplies.filter(r => r.parent_id === c.id))).join('');
+  // 分页
+  totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
+  if(currentPage > totalPages) currentPage = totalPages;
+  if(currentPage < 1) currentPage = 1;
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const pageItems = sorted.slice(start, start + PAGE_SIZE);
+  list.innerHTML = pageItems.map(c => renderComment(c, floorMap[c.id], allReplies.filter(r => r.parent_id === c.id))).join('');
+  renderPager();
+}
+
+function renderPager(){
+  const pager = document.getElementById('commentPager');
+  if(totalPages <= 1){ pager.style.display = 'none'; return; }
+  pager.style.display = 'flex';
+  const prevDisabled = currentPage <= 1;
+  const nextDisabled = currentPage >= totalPages;
+  pager.innerHTML = `
+    <button class="pager-btn" ${prevDisabled ? 'disabled' : ''} onclick="goPage(${currentPage-1})">上一页</button>
+    <span class="pager-info">第 ${currentPage} / ${totalPages} 页</span>
+    <button class="pager-btn" ${nextDisabled ? 'disabled' : ''} onclick="goPage(${currentPage+1})">下一页</button>
+    <span class="pager-jump">跳转
+      <input id="pagerJumpInput" class="pager-input" type="number" min="1" max="${totalPages}" placeholder="${currentPage}" onkeydown="if(event.key==='Enter')jumpPage()">
+      <button class="pager-btn" onclick="jumpPage()">GO</button>
+    </span>`;
+}
+
+function goPage(n){
+  if(n < 1 || n > totalPages) return;
+  currentPage = n;
+  renderCommentList();
+}
+
+function jumpPage(){
+  const input = document.getElementById('pagerJumpInput');
+  let n = parseInt(input.value, 10);
+  if(isNaN(n)){ alert('请输入正确的页码喵'); return; }
+  if(n < 1) n = 1;
+  if(n > totalPages) n = totalPages;
+  currentPage = n;
+  renderCommentList();
 }
 
 function renderComment(c, floor, replies){
@@ -1122,14 +1179,14 @@ async function toggleLike(commentId){
     if(error){ alert('点赞失败：' + zhErr(error.message)); return; }
     likedSet.add(commentId);
   }
-  await loadComments(true);
+  await loadComments(false);
 }
 
 async function deleteComment(id){
   if(!confirm('确定删除这条评论吗喵？删除后其下的回复也会一并删除喵。')) return;
   const { error } = await supabaseClient.from('comments').delete().eq('id', id);
   if(error){ alert('删除失败：' + zhErr(error.message)); return; }
-  await loadComments(true);
+  await loadComments(false);
 }
 
 // ========== 管理面板（站长/管理员） ==========
