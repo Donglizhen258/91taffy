@@ -548,7 +548,7 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
       <button class="auth-tab active" id="tabEmail" onclick="switchLoginTab('email')">邮箱登录</button>
       <button class="auth-tab" id="tabAccount" onclick="switchLoginTab('account')">账号登录</button>
     </div>
-    <div class="field" id="loginEmailField"><label>邮箱</label><input id="loginEmail" type="email" placeholder="you@example.com"></div>
+    <div class="field" id="loginEmailField"><label>邮箱</label><input id="loginEmail" type="email" placeholder="例如 xxx@qq.com"></div>
     <div class="field" id="loginAccountField" style="display:none"><label>账号（昵称）</label><input id="loginAccount" type="text" placeholder="你的昵称或用户名"></div>
     <div class="field"><label>密码</label><input id="loginPass" type="password" placeholder="密码"></div>
     <button class="btn" id="loginBtn" style="width:100%" onclick="doLogin()">登录</button>
@@ -562,7 +562,7 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
   <div class="modal">
     <h3>注册新账号</h3>
     <div class="auth-error" id="regError"></div>
-    <div class="field"><label>邮箱</label><input id="regEmail" type="email" placeholder="you@example.com"></div>
+    <div class="field"><label>邮箱</label><input id="regEmail" type="email" placeholder="例如 xxx@qq.com"></div>
     <div class="field"><label>昵称</label><input id="regNick" placeholder="你的昵称"></div>
     <div class="field"><label>密码</label><input id="regPass" type="password" placeholder="至少6位"></div>
     <div class="field"><label>性别</label>
@@ -612,7 +612,14 @@ const SUPABASE_URL = 'https://gxdmrwlttvwyzqusmgzz.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_VsIt-R_HLUct_YXMHkr6jg_YQWAnjpQ';
 // 兜底：即使 supabaseClient.js 加载失败也不让页面脚本崩溃，登录/注册弹窗按钮照常可点
 const supabaseClient = (window.supabase && window.supabase.createClient)
-  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: {
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: false,
+        flowType: 'pkce'
+      }
+    })
   : null;
 
 // ========== 页面标识（每页通用，改这个值即可换页） ==========
@@ -919,10 +926,17 @@ function insertEmoji(name, path){
 }
 
 // ========== 会话与用户 ==========
+// getUser 加 3 秒超时保护：过期 token 触发刷新若网络慢，不阻塞页面（按未登录处理）
+function withTimeout(promise, ms, fallback){
+  return Promise.race([
+    promise,
+    new Promise(res => setTimeout(() => res(fallback), ms))
+  ]);
+}
 async function loadSession(){
   let user = null;
   try{
-    const r = await supabaseClient.auth.getUser();
+    const r = await withTimeout(supabaseClient.auth.getUser(), 3000, { data: { user: null } });
     user = r.data && r.data.user;
   }catch(e){
     console.error('supabaseClient 未就绪', e);
@@ -951,11 +965,18 @@ async function loadSession(){
       document.getElementById('userActions').innerHTML =
         `<button class="btn btn-ghost btn-small" onclick="showLogin()">登录</button>
          <button class="btn btn-small" onclick="showRegister()">注册</button>`;
+      const navAcc = document.getElementById('navAccount');
+      if(navAcc) navAcc.style.display = 'none';
+      const navAdmin = document.getElementById('navAdmin');
+      if(navAdmin) navAdmin.style.display = 'none';
       alert(banMsg);
       setCommentLocked(true);
       return;
     }
     renderUserBar();
+    // 已登录：显示「账号管理」菜单
+    const navAcc = document.getElementById('navAccount');
+    if(navAcc) navAcc.style.display = '';
     // 已登录：根据角色决定是否显示「网站管理」菜单
     const navAdmin = document.getElementById('navAdmin');
     if(currentProfile && ['owner','admin'].includes(currentProfile.role)){
@@ -968,7 +989,9 @@ async function loadSession(){
     // 已登录：解锁评论区
     setCommentLocked(false);
   } else {
-    // 未登录：保持上锁
+    // 未登录：隐藏「账号管理」菜单，保持上锁
+    const navAcc = document.getElementById('navAccount');
+    if(navAcc) navAcc.style.display = 'none';
     setCommentLocked(true);
   }
 }
@@ -1012,14 +1035,21 @@ function zhErr(msg){
     [/password.*(too short|should be at least)|at least \d+ characters|Password should be/i, '密码太短啦，至少需要6位喵'],
     [/user already exists|User already exists/i, '该用户已存在，请直接登录喵'],
     [/rate limit|too many requests|Requests rate limit/i, '操作太频繁啦，请稍后再试喵'],
-    [/network|fetch failed|Failed to fetch|load failed/i, '网络连接失败，请检查网络后重试喵'],
-    [/unable to validate|token has expired|JWT|invalid token/i, '登录状态已失效，请重新登录喵'],
+    [/network|fetch failed|Failed to fetch|load failed|timeout|timed out|ECONNRESET|ERR_CONNECTION/i, '网络连接失败，请检查网络后重试喵'],
+    [/unable to validate|token has expired|JWT|invalid token|refresh token/i, '登录状态已失效，请重新登录喵'],
     [/for security purposes|signup.*disabled|signups.*not allowed/i, '暂未开放注册，请稍后再试喵'],
-    [/database error|internal error|server error/i, '服务器开小差了，请稍后再试喵'],
-    [/too many email/i, '验证邮件发送太频繁啦，请稍后再试喵']
+    [/database error|internal error|server error|PostgrestError|status.?4\d\d/i, '服务器开小差了，请稍后再试喵'],
+    [/too many email/i, '验证邮件发送太频繁啦，请稍后再试喵'],
+    [/new password should be different|password.*same/i, '新密码不能和旧密码一样喵'],
+    [/reauthentication|re-auth|recent login/i, '为了安全，请重新登录后再试喵'],
+    [/over email send rate limit/i, '邮件发送太频繁啦，请稍后再试喵']
   ];
   for(const [re, zh] of map){
     if(re.test(m)) return zh;
+  }
+  // 兜底：遇到没收录的英文错误时，给出通用中文提示（不再直接回显英文）
+  if(/[A-Za-z]{3,}/.test(m) && !/[\u4e00-\u9fa5]/.test(m)){
+    return '操作失败：' + m.replace(/\s+/g,' ').slice(0,120) + '（请稍后再试喵）';
   }
   return m;
 }
@@ -1183,23 +1213,25 @@ async function tryLogin(cred, btn, err, byAccount){
   btn.innerHTML = '登录成功 ✓';
   btn.disabled = true;
   renderUserBar();
+  // 登录成功：显示「账号管理」菜单
+  const navAcc = document.getElementById('navAccount');
+  if(navAcc) navAcc.style.display = '';
   // 根据角色决定「网站管理」菜单的可见性
   const navAdmin = document.getElementById('navAdmin');
   if(currentProfile && ['owner','admin'].includes(currentProfile.role)){
     if(navAdmin) navAdmin.style.display = '';
+    // 管理面板后台异步刷新，不阻塞登录成功反馈与弹窗关闭
     renderAdminPanel();
   } else {
     if(navAdmin) navAdmin.style.display = 'none';
   }
   setCommentLocked(false); // 登录成功，解锁评论区
-  setTimeout(()=>{
-    closeModal('loginModal');
-    btn.disabled = false;
-    btn.innerHTML = '登录';
-    delete btn.dataset.orig;
-    err.classList.remove('ok');
-    err.textContent = '';
-  }, 600);
+  // 立即关弹窗给反馈（不再等 600ms），评论列表后台刷新
+  closeModal('loginModal');
+  btn.disabled = false;
+  btn.innerHTML = '登录';
+  delete btn.dataset.orig;
+  setTimeout(()=>{ err.classList.remove('ok'); err.textContent = ''; }, 1200);
   if(ACTIVE === 'profile' && viewingUserId){
     await loadProfile(viewingUserId); // 资料页登录：刷新资料与封禁区
   } else {
@@ -1216,6 +1248,9 @@ async function doLogout(){
   document.getElementById('adminPanel').style.display = 'none';
   const navAdmin = document.getElementById('navAdmin');
   if(navAdmin) navAdmin.style.display = 'none';
+  // 退出后隐藏「账号管理」菜单
+  const navAcc = document.getElementById('navAccount');
+  if(navAcc) navAcc.style.display = 'none';
   document.getElementById('commentInput').placeholder = '登录后即可评论喵...';
   document.getElementById('commentInput').disabled = true;
   setCommentLocked(true); // 退出后重新上锁
@@ -1497,7 +1532,7 @@ function renderPager(){
     <button class="pager-btn" ${nextDisabled ? 'disabled' : ''} onclick="goPage(${currentPage+1})">下一页</button>
     <span class="pager-jump">跳转
       <input id="pagerJumpInput" class="pager-input" type="number" min="1" max="${totalPages}" placeholder="${currentPage}" onkeydown="if(event.key==='Enter')jumpPage()">
-      <button class="pager-btn" onclick="jumpPage()">GO</button>
+      <button class="pager-btn" onclick="jumpPage()">跳转</button>
     </span>`;
 }
 
@@ -1794,7 +1829,7 @@ function renderProfilePager(){
     <button class="pager-btn" ${nextDisabled ? 'disabled' : ''} onclick="goProfilePage(${pCurrentPage+1})">下一页</button>
     <span class="pager-jump">跳转
       <input id="profilePagerJumpInput" class="pager-input" type="number" min="1" max="${pTotalPages}" placeholder="${pCurrentPage}" onkeydown="if(event.key==='Enter')jumpProfilePage()">
-      <button class="pager-btn" onclick="jumpProfilePage()">GO</button>
+      <button class="pager-btn" onclick="jumpProfilePage()">跳转</button>
     </span>`;
 }
 function goProfilePage(n){
@@ -1938,7 +1973,12 @@ async function unbanUser(){
 
 // ========== 管理面板（站长/管理员） ==========
 let adminDetailUser = null;
+let adminPanelPending = false;
 async function renderAdminPanel(){
+  // 防并发：同一时刻只允许一个加载任务，避免登录/会话恢复重复触发多个请求
+  if(adminPanelPending) return;
+  adminPanelPending = true;
+  try{
   const panel = document.getElementById('adminPanel');
   panel.style.display = 'block';
   const isOwner = currentProfile.role === 'owner';
@@ -1986,7 +2026,8 @@ async function renderAdminPanel(){
     </div>`;
   }).join('');
   // 站长可见「已删除 uid 列表」，管理员也可查看
-  renderDeletedUids();
+  await renderDeletedUids();
+  }finally{ adminPanelPending = false; }
 }
 // ========== 已删除 uid 冻结/回调列表 ==========
 async function renderDeletedUids(){
