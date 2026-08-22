@@ -281,7 +281,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
 // ========== 配置（雏草姬的 Supabase 项目） ==========
 const SUPABASE_URL = 'https://gxdmrwlttvwyzqusmgzz.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_VsIt-R_HLUct_YXMHkr6jg_YQWAnjpQ';
-// 兜底：即使 supabase.js 加载失败也不让页面脚本崩溃，登录/注册弹窗按钮照常可点
+// 兜底：即使 supabaseClient.js 加载失败也不让页面脚本崩溃，登录/注册弹窗按钮照常可点
 const supabaseClient = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
   : null;
@@ -365,7 +365,7 @@ async function loadSession(){
     const r = await supabaseClient.auth.getUser();
     user = r.data && r.data.user;
   }catch(e){
-    console.error('supabase 未就绪', e);
+    console.error('supabaseClient 未就绪', e);
   }
   if(user){
     currentUser = user;
@@ -422,7 +422,7 @@ async function doRegister(){
   if(isTemporaryEmail(email)){ err.textContent='该邮箱为临时邮箱，暂不支持注册喵'; return; }
   if(!nick){ err.textContent='请输入昵称'; return; }
   if(pass.length < 6){ err.textContent='密码至少6位'; return; }
-  if(!supabase){ err.textContent='服务暂不可用，请稍后重试喵'; return; }
+  if(!supabaseClient){ err.textContent='服务暂不可用，请稍后重试喵'; return; }
   const { data, error } = await supabaseClient.auth.signUp({
     email, password: pass,
     options:{ data:{ username:nick, nickname:nick, gender } }
@@ -441,7 +441,7 @@ async function doLogin(){
   const pass = document.getElementById('loginPass').value;
   const err = document.getElementById('loginError');
   if(!email || !pass){ err.textContent='请输入邮箱和密码'; return; }
-  if(!supabase){ err.textContent='服务暂不可用，请稍后重试喵'; return; }
+  if(!supabaseClient){ err.textContent='服务暂不可用，请稍后重试喵'; return; }
   const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password: pass });
   if(error){
     if(error.message.includes('Email not confirmed')) err.textContent='请先到邮箱点击验证链接喵';
@@ -555,13 +555,13 @@ async function submitComment(){
 }
 async function loadComments(reset){
   if(reset){ currentPage = 1; }
-  if(!supabase){
+  if(!supabaseClient){
     document.getElementById('commentList').innerHTML = `<div class="empty">评论服务暂不可用，请稍后刷新喵</div>`;
     return;
   }
   const from = (currentPage-1)*PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
-  const { data, error, count } = await supabase
+  const { data, error, count } = await supabaseClient
     .from('comments')
     .select('*, author:profiles(id,nickname,username,uid,role)', { count:'exact' })
     .eq('page_id', PAGE_ID)
