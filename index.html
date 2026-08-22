@@ -1079,11 +1079,27 @@ async function tryLogin(cred, btn, err, byAccount){
     return;
   }
   currentUser = data.user;
-  const { data: prof } = await supabaseClient.from('profiles').select('*').eq('id', data.user.id).single();
+  let prof = null;
+  const { data: prof1 } = await supabaseClient.from('profiles').select('*').eq('id', data.user.id).maybeSingle();
+  prof = prof1;
+  // 已登录但无 profiles（如验证后才建号、或触发器偶发未触发）：RPC 兜底补建再读一次
   if(!prof){
-    // 账号资料缺失（常见于注册时 profiles 插入失败的残留账号）
+    try{
+      const meta = data.user.user_metadata || {};
+      await supabaseClient.rpc('ensure_profile', {
+        p_id: data.user.id,
+        p_email: data.user.email || '',
+        p_username: meta.username || null,
+        p_nickname: meta.nickname || null
+      });
+      const { data: prof2 } = await supabaseClient.from('profiles').select('*').eq('id', data.user.id).maybeSingle();
+      prof = prof2;
+    }catch(e){ /* 补建失败不阻断，下面按缺失处理 */ }
+  }
+  if(!prof){
+    // 账号资料缺失（理论上仅剩未验证/被删等极端情况）
     setAuthLoading(btn, false);
-    err.textContent = '账号资料缺失，请重新注册或联系站长处理喵';
+    err.textContent = '账号资料缺失，请先到邮箱验证或联系站长处理喵';
     await supabaseClient.auth.signOut();
     currentUser = null;
     return;
