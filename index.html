@@ -227,6 +227,23 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
 .user-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
 .user-row .u-name{font-weight:600;font-size:14px}
 .user-row .u-meta{font-size:12px;color:var(--ink-400)}
+.user-row .u-meta .ban-tag{color:var(--bad);font-weight:600}
+/* 管理面板：自定义天数封禁行 */
+.ban-row{margin-top:4px}
+.ban-row input{width:90px;padding:5px 8px;border:1px solid rgba(178,58,99,.4);border-radius:4px;
+  font-size:13px;color:var(--ink-900);background:#fff;outline:none}
+.ban-row input:focus{border-color:var(--pink-500);box-shadow:0 0 0 2px rgba(212,83,126,.2)}
+/* 账号详情弹窗 */
+.detail-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:7px 0;
+  border-bottom:1px dashed rgba(178,58,99,.18);font-size:14px}
+.detail-row .dl{color:var(--ink-600)}
+.detail-row .dv{color:var(--ink-900);word-break:break-all;text-align:right}
+.detail-auth-tag{display:inline-block;padding:1px 10px;border-radius:3px;font-size:12px;color:#fff;
+  border:1px solid rgba(0,0,0,.25);box-shadow:inset 0 1px 0 rgba(255,255,255,.35)}
+.detail-auth-tag.verified{background:linear-gradient(180deg,#7ecb9a,#3f9a63)}
+.detail-auth-tag.unverified{background:linear-gradient(180deg,#f0a05a,#c07a2a)}
+.detail-buttons{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.detail-buttons .btn{width:100%}
 .empty{text-align:center;color:var(--ink-400);font-size:13px;padding:20px 0}
 .loading{text-align:center;color:var(--pink-500);font-size:13px;padding:16px}
 .footer{text-align:center;font-size:12px;color:rgba(142,45,79,.65);padding:20px;text-shadow:0 1px 0 rgba(255,255,255,.5)}
@@ -550,6 +567,16 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
     <button class="btn" id="regBtn" style="width:100%" onclick="doRegister()">注册</button>
     <div class="auth-tip">已有账号？<a onclick="showLogin()">去登录</a></div>
     <div class="auth-tip"><a onclick="closeModal('regModal')">关闭</a></div>
+  </div>
+</div>
+
+<!-- 账号详情弹窗（站长/管理员查看/重置密码/删除账户） -->
+<div class="modal-mask" id="userDetailModal">
+  <div class="modal">
+    <h3>账号详情</h3>
+    <div class="auth-error" id="userDetailMsg"></div>
+    <div id="userDetailBody"></div>
+    <div class="auth-tip"><a onclick="closeModal('userDetailModal')">关闭</a></div>
   </div>
 </div>
 
@@ -1889,6 +1916,7 @@ async function unbanUser(){
 }
 
 // ========== 管理面板（站长/管理员） ==========
+let adminDetailUser = null;
 async function renderAdminPanel(){
   const panel = document.getElementById('adminPanel');
   panel.style.display = 'block';
@@ -1896,38 +1924,44 @@ async function renderAdminPanel(){
   document.getElementById('adminTitle').textContent = isOwner ? '管理面板（站长）' : '管理面板（管理员）';
   const list = document.getElementById('adminUserList');
   list.innerHTML = '<div class="loading">加载用户中喵...</div>';
-  const { data, error } = await supabaseClient.from('profiles')
-    .select('id,uid,nickname,username,email,gender,role,status,created_at')
-    .order('uid', { ascending:true });
-  if(error){ list.innerHTML = `<div class="empty">加载失败：${zhErr(error.message)}</div>`; return; }
+  // 用 RPC 拉取：附带邮箱认证状态/最后登录/封禁到期（前端不可直接读 auth.users）
+  let { data, error } = await supabaseClient.rpc('admin_list_users');
+  if(error || !data){
+    // RPC 不存在（迁移没跑）时降级为 profiles 直查，仍能显示基础列表
+    const fb = await supabaseClient.from('profiles')
+      .select('id,uid,nickname,username,email,gender,role,status,ban_until,created_at')
+      .order('uid', { ascending:true });
+    if(fb.error){ list.innerHTML = `<div class="empty">加载失败：${zhErr(error ? error.message : fb.error.message)}</div>`; return; }
+    data = fb.data;
+  }
   list.innerHTML = data.map(u => {
     const roleText = u.role==='owner'?'站长':u.role==='admin'?'管理员':'用户';
-    const statusText = u.status==='active'?'正常':'已封禁';
-    let btns = '';
-    if(isOwner && u.role !== 'owner'){
-      if(u.role === 'admin'){
+    const canManage = isOwner ? u.role !== 'owner' : u.role === 'user';
+    const isBanned = u.status === 'banned';
+    const banTag = isBanned ? ' <span class="ban-tag">（已封禁）</span>' : '';
+    const authTag = u.email_confirmed === false
+      ? ' <span class="ban-tag">（未验证邮箱）</span>' : '';
+    let btns = `<button class="btn btn-ghost btn-small" onclick="openUserDetail('${u.id}')">详情</button>`;
+    if(canManage){
+      if(isOwner && u.role === 'admin'){
         btns += `<button class="btn btn-ghost btn-small" onclick="setRole('${u.id}','user')">取消管理员</button>`;
-      } else {
+      } else if(isOwner && u.role === 'user'){
         btns += `<button class="btn btn-ok btn-small" onclick="setRole('${u.id}','admin')">任命管理员</button>`;
       }
-      if(u.status === 'active'){
-        btns += `<button class="btn btn-bad btn-small" onclick="setStatus('${u.id}','banned')">封禁</button>`;
-      } else {
+      if(isBanned){
         btns += `<button class="btn btn-ok btn-small" onclick="setStatus('${u.id}','active')">解封</button>`;
-      }
-    } else if(!isOwner && u.role === 'user'){
-      if(u.status === 'active'){
-        btns += `<button class="btn btn-bad btn-small" onclick="setStatus('${u.id}','banned')">封禁</button>`;
       } else {
-        btns += `<button class="btn btn-ok btn-small" onclick="setStatus('${u.id}','active')">解封</button>`;
+        btns += `<button class="btn btn-bad btn-small" onclick="setStatus('${u.id}','banned')">永久封禁</button>`;
+        btns += `<button class="btn btn-bad btn-small" onclick="banUserDays('${u.id}')">自定义天数封禁</button>`;
       }
+      btns += `<button class="btn btn-bad btn-small" onclick="deleteAccount('${u.id}','${escapeHtml(u.nickname||u.username)}')">删除账户</button>`;
     }
     return `<div class="user-row">
       <span class="u-name">${escapeHtml(u.nickname||u.username)}</span>
       <span class="uid-badge">UID ${u.uid}</span>
       <span class="role-badge ${u.role==='owner'?'role-owner':u.role==='admin'?'role-admin':'role-user'}">${roleText}</span>
-      <span class="u-meta">${u.status==='banned'?'<b style="color:var(--bad)">已封禁</b>':statusText}${u.email?(' · '+u.email):''} · ${new Date(u.created_at).toLocaleDateString('zh-CN')}</span>
-      ${btns}
+      <span class="u-meta">${u.status==='banned'?'<b style="color:var(--bad)">已封禁</b>':u.status}${u.email?(' · '+escapeHtml(u.email)):''}${authTag}${banTag} · ${new Date(u.created_at).toLocaleDateString('zh-CN')}</span>
+      <span style="display:flex;gap:6px;flex-wrap:wrap">${btns}</span>
     </div>`;
   }).join('');
 }
@@ -1944,6 +1978,112 @@ async function setStatus(userId, status){
     : { status:'active', ban_until:null };
   const { error } = await supabaseClient.from('profiles').update(patch).eq('id', userId);
   if(error){ alert('操作失败：' + zhErr(error.message)); return; }
+  renderAdminPanel();
+}
+// 自定义天数封禁（管理面板里用）
+async function banUserDays(userId){
+  const days = prompt('请输入封禁天数（正整数，如 7、30）：');
+  if(days === null) return;
+  const n = parseInt(days, 10);
+  if(isNaN(n) || n < 1){ alert('请输入正确的封禁天数喵'); return; }
+  if(!confirm(`确定封禁该用户 ${n} 天吗喵？`)) return;
+  const banUntil = new Date(Date.now() + n*86400000).toISOString();
+  const { error } = await supabaseClient.from('profiles')
+    .update({ status:'banned', ban_until: banUntil }).eq('id', userId);
+  if(error){ alert('封禁失败：' + zhErr(error.message)); return; }
+  alert(`已封禁 ${n} 天喵`);
+  renderAdminPanel();
+}
+// ========== 账号详情弹窗（站长/管理员） ==========
+function openUserDetail(userId){
+  adminDetailUser = userId;
+  const msg = document.getElementById('userDetailMsg');
+  msg.className = 'auth-error';
+  msg.textContent = '';
+  document.getElementById('userDetailBody').innerHTML = '<div class="loading">加载中喵...</div>';
+  document.getElementById('userDetailModal').classList.add('show');
+  loadUserDetail();
+}
+async function loadUserDetail(){
+  const body = document.getElementById('userDetailBody');
+  const msg = document.getElementById('userDetailMsg');
+  const { data, error } = await supabaseClient.rpc('admin_list_users');
+  if(error || !data){
+    body.innerHTML = `<div class="empty">加载失败：${zhErr(error ? error.message : '')}</div>`;
+    return;
+  }
+  const u = data.find(x => x.id === adminDetailUser);
+  if(!u){ body.innerHTML = '<div class="empty">未找到该用户喵</div>'; return; }
+  const roleText = u.role==='owner'?'站长':u.role==='admin'?'管理员':'用户';
+  const statusText = u.status==='active' ? '正常' : '已封禁';
+  let banInfo = '未封禁';
+  if(u.status === 'banned'){
+    if(u.ban_until){
+      const remain = new Date(u.ban_until).getTime() - Date.now();
+      const days = Math.ceil(remain / 86400000);
+      if(days > 36500) banInfo = '永久封禁';
+      else if(days > 0) banInfo = `封禁中，剩余 ${days} 天`;
+      else banInfo = '封禁已到期（未解封）';
+    } else banInfo = '已封禁';
+  }
+  const authTag = u.email_confirmed
+    ? '<span class="detail-auth-tag verified">已验证</span>'
+    : '<span class="detail-auth-tag unverified">未验证</span>';
+  const lastLogin = u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleString('zh-CN') : '从未登录';
+  const me = currentProfile;
+  const canManage = (me.role === 'owner' && u.role !== 'owner') || (me.role === 'admin' && u.role === 'user');
+  const isSelf = me.id === u.id;
+  let manageBtns = '';
+  if(canManage && !isSelf){
+    manageBtns += `<button class="btn btn-ghost" onclick="adminResetPass()">重置密码（设新密码）</button>`;
+    if(u.status === 'banned'){
+      manageBtns += `<button class="btn btn-ok" onclick="setStatus('${u.id}','active')">解封</button>`;
+    } else {
+      manageBtns += `<button class="btn btn-bad" onclick="setStatus('${u.id}','banned')">永久封禁</button>`;
+    }
+    manageBtns += `<button class="btn btn-bad" onclick="deleteAccount('${u.id}','${escapeHtml(u.nickname||u.username)}')">删除账户</button>`;
+  }
+  body.innerHTML = `
+    <div class="detail-row"><span class="dl">昵称</span><span class="dv">${escapeHtml(u.nickname||u.username)}</span></div>
+    <div class="detail-row"><span class="dl">用户名</span><span class="dv">${escapeHtml(u.username||'-')}</span></div>
+    <div class="detail-row"><span class="dl">UID</span><span class="dv">${u.uid}</span></div>
+    <div class="detail-row"><span class="dl">角色</span><span class="dv">${roleText}</span></div>
+    <div class="detail-row"><span class="dl">邮箱</span><span class="dv">${escapeHtml(u.email||'-')}</span></div>
+    <div class="detail-row"><span class="dl">认证状态</span><span class="dv">${authTag}</span></div>
+    <div class="detail-row"><span class="dl">账号状态</span><span class="dv">${statusText}</span></div>
+    <div class="detail-row"><span class="dl">封禁信息</span><span class="dv">${banInfo}</span></div>
+    <div class="detail-row"><span class="dl">注册时间</span><span class="dv">${new Date(u.created_at).toLocaleString('zh-CN')}</span></div>
+    <div class="detail-row"><span class="dl">最后登录</span><span class="dv">${lastLogin}</span></div>
+    ${canManage ? `<div class="detail-buttons">${manageBtns}</div>` : ''}
+    <div style="font-size:12px;color:var(--ink-400);margin-top:12px;text-align:center">
+      密码为加密存储，站长无法查看明文，可重置为新密码喵
+    </div>`;
+}
+// 重置密码
+async function adminResetPass(){
+  const msg = document.getElementById('userDetailMsg');
+  msg.className = 'auth-error';
+  msg.textContent = '';
+  if(!adminDetailUser) return;
+  const newPass = prompt('请输入该用户的新密码（至少6位）：');
+  if(newPass === null) return;
+  if(newPass.length < 6){ msg.textContent = '新密码至少 6 位喵'; return; }
+  if(!confirm('确定把该用户密码重置为新密码吗喵？')) return;
+  const { error } = await supabaseClient.rpc('admin_reset_password', {
+    target_id: adminDetailUser, new_password: newPass
+  });
+  if(error){ msg.className = 'auth-error'; msg.textContent = '重置失败：' + zhErr(error.message); return; }
+  msg.className = 'auth-error ok';
+  msg.textContent = '✓ 密码已重置喵';
+}
+// 删除账户
+async function deleteAccount(userId, name){
+  if(!confirm(`⚠️ 确定要永久删除用户「${name}」吗喵？\n将删除其账号与所有点赞记录，评论保留但作者变为"神秘用户"。此操作不可恢复！`)) return;
+  if(!confirm(`再确认一次：真的要删除「${name}」吗喵？`)) return;
+  const { error } = await supabaseClient.rpc('admin_delete_user', { target_id: userId });
+  if(error){ alert('删除失败：' + zhErr(error.message)); return; }
+  alert('账户已删除喵');
+  document.getElementById('userDetailModal').classList.remove('show');
   renderAdminPanel();
 }
 
