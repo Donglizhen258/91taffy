@@ -89,6 +89,14 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
 .auth-tabs{display:flex;gap:8px;margin-bottom:14px}
 .auth-tab{flex:1;padding:7px 0;font-size:13px;border:1px solid rgba(178,58,99,.4);border-radius:4px;background:#fff;color:var(--ink-600);cursor:pointer;transition:.12s}
 .auth-tab.active{background:linear-gradient(180deg,#fdb1cc,#d4537e);color:#fff;font-weight:600;border-color:rgba(178,58,99,.55)}
+/* 账号信息卡（邮箱 + 认证状态） */
+.acc-info{background:rgba(255,255,255,.65);border:1px solid rgba(178,58,99,.28);border-radius:6px;padding:12px 14px;margin-bottom:16px;font-size:14px}
+.acc-info-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:4px 0}
+.acc-info-label{color:var(--ink-600)}
+.acc-info-value{color:var(--ink-900);word-break:break-all;text-align:right}
+.acc-auth-tag{display:inline-block;padding:2px 12px;border-radius:3px;font-size:12px;color:#fff;border:1px solid rgba(0,0,0,.25);box-shadow:inset 0 1px 0 rgba(255,255,255,.35)}
+.acc-auth-tag.verified{background:linear-gradient(180deg,#7ecb9a,#3f9a63)}
+.acc-auth-tag.unverified{background:linear-gradient(180deg,#f0a05a,#c07a2a)}
 .btn[disabled]{opacity:.6;cursor:not-allowed;filter:grayscale(.35)}
 .spinner{display:inline-block;width:13px;height:13px;border:2px solid rgba(255,255,255,.45);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;vertical-align:-2px;margin-right:6px}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -367,6 +375,10 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
         <h2 style="font-size:20px;color:var(--ink-600)">账号管理</h2>
       </div>
       <div class="acc-msg" id="accMsg"></div>
+      <div class="acc-info" id="accInfoCard" style="display:none">
+        <div class="acc-info-row"><span class="acc-info-label">邮箱</span><span class="acc-info-value" id="accInfoEmail">-</span></div>
+        <div class="acc-info-row"><span class="acc-info-label">认证状态</span><span id="accInfoAuth" class="acc-auth-tag">-</span></div>
+      </div>
       <div class="acc-field">
         <label>昵称</label>
         <input id="accNick" placeholder="你的昵称" maxlength="20">
@@ -679,13 +691,24 @@ function loadAccountView(){
     msg.className = 'acc-msg bad';
     msg.textContent = '请先登录后再管理账号喵';
     document.getElementById('accNick').value = '';
-    // 未登录：显示默认头像
+    // 未登录：显示默认头像 + 隐藏邮箱/认证卡
     accImg.src = DEFAULT_AVATAR;
     accAvatarUrl = '';
+    document.getElementById('accInfoCard').style.display = 'none';
     return;
   }
   msg.className = 'acc-msg';
   msg.textContent = '';
+  // 邮箱 + 认证状态卡
+  const infoCard = document.getElementById('accInfoCard');
+  infoCard.style.display = 'block';
+  const emailEl = document.getElementById('accInfoEmail');
+  const authEl = document.getElementById('accInfoAuth');
+  emailEl.textContent = currentUser.email || '未绑定邮箱';
+  const confirmed = !!currentUser.email_confirmed_at;
+  authEl.textContent = confirmed ? '已认证' : '未认证';
+  authEl.className = 'acc-auth-tag ' + (confirmed ? 'verified' : 'unverified');
+  if(!confirmed){ authEl.title = '请到你注册邮箱查收验证邮件并点击链接喵'; }
   // 填充当前昵称
   document.getElementById('accNick').value = currentProfile ? (currentProfile.nickname || '') : '';
   // 填充详细资料
