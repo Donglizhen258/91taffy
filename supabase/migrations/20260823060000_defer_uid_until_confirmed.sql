@@ -7,6 +7,15 @@
 --   4. 新增 ensure_profile() RPC：前端登录成功兜底补建（防触发器偶发未触发，仅允许给当前登录用户建）
 -- 站长认定：第一个完成邮箱验证并建出 profiles 的用户 = uid0/owner（真站长必会验证自己的邮箱）
 -- 运行方式：Supabase 控制台 -> SQL Editor -> 粘贴执行。幂等，可重复执行。
+-- 安全说明：本脚本不含任何 delete/update 现有 profiles/uid 的语句，不会删除或改动已有账号；
+--           仅重建函数/触发器/RPC。已在库中的 uid0/uid1/uid2/uid3 全部保留。
+
+-- ============ 0. 确保既有特殊账号已确认（防止被新逻辑"未验证跳过"影响） ============
+-- 站内管家/test01 若之前未验证，这里统一补确认，保证旧号在新逻辑下也不受影响
+update auth.users
+set email_confirmed_at = coalesce(email_confirmed_at, now())
+where lower(email) in ('zhanding@91taffy.com', 'test01@91taffy.com')
+  and email_confirmed_at is null;
 
 -- ============ 1. 改写建号函数：未验证不建、已存在不建 ============
 create or replace function public.handle_new_user()
