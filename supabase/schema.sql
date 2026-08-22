@@ -4,10 +4,14 @@
 
 -- ============================================================
 -- 0. 扩展：uid 自增序列
--- uid 从 1 开始，uid1 = 第一个管理员（maxdong0404@163.com）
--- uid 分配：站长会拿到最小的可用 uid（含 uid1），后续注册者递增
+-- uid 方案：序列从 1 开始正常递增（PostgreSQL 不允许 start 0）
+-- uid0 是特殊存在：站长（1301535058@qq.com）注册时由触发器单独赋予 uid=0，不走序列
+-- uid1 = 第一个管理员（maxdong0404@163.com）从序列拿到 1
+-- 后续普通用户从 uid2 起递增
 -- ============================================================
 create sequence if not exists public.uid_seq start 1;
+-- 兜底：若之前误建过 start 0 的旧序列，重置为从 1 开始
+alter sequence public.uid_seq restart with 1;
 
 -- ============================================================
 -- 1. 用户资料表（含 uid / 角色 / 状态 / 性别）
@@ -174,29 +178,37 @@ create policy "public insert scores" on public.scores
 
 -- ============================================================
 -- 9. 触发器：注册时自动建资料
--- uid1 绑定第一个管理员邮箱 maxdong0404@163.com → role=admin
--- 站长邮箱 1301535058@qq.com → role=owner（由雏草姬注册时自动成为站长）
--- 其余新用户 → role=user
+-- 站长认定机制（不依赖邮箱，防止换绑邮箱导致权限丢失/被冒领）：
+--   - 第一个注册的用户 = 站长：uid=0 且 role=owner（uid0 特殊存在，不走序列）
+--   - 之后注册的用户 uid 从序列递增（1、2、3...），role=user
+--   - 管理员不靠邮箱识别，由站长在管理面板里手动任命
+-- 站长换绑邮箱不影响 uid0 身份；即使有人抢注同邮箱，也拿不到 uid0
 -- ============================================================
 create or replace function public.handle_new_user()
 returns trigger as $$
 declare
   v_email text;
+  v_uid integer;
+  v_role text;
 begin
   v_email := lower(coalesce(new.email, ''));
+  -- 判断是否已有任何用户：若无则当前注册者是站长（uid0）
+  if not exists (select 1 from public.profiles) then
+    v_uid := 0;
+    v_role := 'owner';
+  else
+    v_uid := nextval('public.uid_seq');
+    v_role := 'user';
+  end if;
   insert into public.profiles (id, uid, email, username, nickname, gender, role, status)
   values (
     new.id,
-    nextval('public.uid_seq'),
+    v_uid,
     nullif(v_email, ''),
     coalesce(new.raw_user_meta_data->>'username', 'user_' || substr(new.id::text, 1, 8)),
     coalesce(new.raw_user_meta_data->>'nickname', new.raw_user_meta_data->>'username'),
     coalesce(new.raw_user_meta_data->>'gender', '保密'),
-    case
-      when v_email = '1301535058@qq.com' then 'owner'
-      when v_email = 'maxdong0404@163.com' then 'admin'
-      else 'user'
-    end,
+    v_role,
     'active'
   );
   return new;
@@ -209,16 +221,13 @@ create trigger on_auth_user_created
   for each row execute procedure public.handle_new_user();
 
 -- ============================================================
--- 10. 手动设定站长/管理员（备用，若注册邮箱不匹配时执行）
--- 把已经注册的这两个邮箱升级为站长/管理员
--- ============================================================
-update public.profiles set role = 'owner'
-  where email = '1301535058@qq.com' and role <> 'owner';
-update public.profiles set role = 'admin'
-  where email = 'maxdong0404@163.com' and role <> 'admin';
-
--- ============================================================
--- 11. 评论频控辅助表（防刷）
+-- 10. 说明：站长/管理员不靠邮箱硬编码
+-- 站长 = 第一个注册者（uid0）
+-- 管理员 = 站长在管理面板中手动任命（前端 setRole 功能）
+-- 若需手动指定，可用下面语句（把某 uid 设为站长/管理员，谨慎执行）：
+--   update public.profiles set role='owner' where uid=0;
+--   update public.profiles set role='admin' where uid=1;
+-- ============================================================-- 11. 评论频控辅助表（防刷）
 -- 记录每条评论发布时间，用于每分钟/每天限次
 -- ============================================================
 create table if not exists public.comment_log (
