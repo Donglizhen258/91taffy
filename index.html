@@ -2845,7 +2845,8 @@ let forumLotteryPrizeRows = 0;     // 发帖弹窗里已添加的奖项行数
 // 抽奖帖子数据缓存（列表关联 lottery 字段 + 详情页额外查询）
 let currentLottery = null;         // 当前帖子详情里的抽奖配置
 let currentLotteryEntries = [];    // 当前帖子参与记录（含作者）
-let currentLotteryWinners = [];    // 当前帖子中奖记录（含作者）
+let currentLotteryWinners = [];    // 当前帖子中奖记录（本人可见，含 code）
+let currentLotteryDisplayWinners = []; // 展示用中奖名单（RPC 脱敏/完整）
 let currentLotteryBans = [];       // 当前帖子禁抽名单（仅楼主/站长/管理员可见）
 
 // ===== 公告横幅（首页顶端） =====
@@ -3012,21 +3013,25 @@ async function openForumPost(id){
   currentLottery = null;
   currentLotteryEntries = [];
   currentLotteryWinners = [];
+  currentLotteryDisplayWinners = [];
   currentLotteryBans = [];
   const isLtManager = currentUser && currentProfile && (
     ['owner','admin'].includes(currentProfile.role) || data.author_id === currentUser.id
   );
   try{
-    const [lg, en, wn, bans] = await Promise.all([
+    const [lg, en, wn, dis, bans] = await Promise.all([
       supabaseClient.from('forum_lotteries')
         .select('post_id,prizes,deadline,claim_note,status,winner_count,created_by,draw_mode,max_entries,entry_count,banned_count')
         .eq('post_id', id).maybeSingle(),
       supabaseClient.from('forum_lottery_entries')
         .select('post_id,user_id,created_at,user:profiles!forum_lottery_entries_user_id_fkey(id,nickname,username,uid,role,avatar_url)')
         .eq('post_id', id),
+      // 本人可见的 winners（含自己 code，用于领奖/展示自己状态；RLS 已收紧）
       supabaseClient.from('forum_lottery_winners')
         .select('post_id,user_id,prize_name,prize_type,contact,claimed,claimed_at,code,user:profiles!forum_lottery_winners_user_id_fkey(id,nickname,username,uid,role,avatar_url)')
         .eq('post_id', id),
+      // 展示用中奖名单（RPC 脱敏：普通用户无 code/contact，管理层完整）
+      supabaseClient.rpc('get_lottery_winners', { p_post_id: id }),
       // 禁抽名单：仅楼主/站长/管理员可读（RLS 已限制，普通用户会拿到空/失败，静默处理）
       isLtManager
         ? supabaseClient.from('forum_lottery_bans')
@@ -3037,12 +3042,14 @@ async function openForumPost(id){
     if(!lg.error && lg.data) currentLottery = lg.data;
     currentLotteryEntries = (en.data || []).map(e => ({ ...e, user: e.user || {} }));
     currentLotteryWinners = (wn.data || []).map(w => ({ ...w, user: w.user || {} }));
+    currentLotteryDisplayWinners = (dis.data || []).map(w => ({ ...w, user: {
+      id: w.user_id, nickname: w.nickname, username: w.username, uid: w.uid, avatar_url: w.avatar_url
+    }}));
     currentLotteryBans = (bans.data || []).map(b => ({ ...b, user: b.user || {} }));
-    // 定时模式：到截止时间自动开奖（有登录用户访问时触发一次）
+    // 定时模式：到截止时间自动开奖（任何人访问即触发一次，RPC 幂等且已放开匿名）
     if(currentLottery && currentLottery.draw_mode === 'scheduled'
        && currentLottery.status === 'drawing'
-       && currentLottery.deadline && new Date(currentLottery.deadline).getTime() < Date.now()
-       && currentUser){
+       && currentLottery.deadline && new Date(currentLottery.deadline).getTime() < Date.now()){
       const { error: autoErr } = await supabaseClient.rpc('maybe_auto_draw', { p_post_id: id });
       if(!autoErr){
         // 重新拉取抽奖状态
@@ -3050,10 +3057,16 @@ async function openForumPost(id){
           .select('post_id,prizes,deadline,claim_note,status,winner_count,created_by,draw_mode,max_entries,entry_count,banned_count')
           .eq('post_id', id).maybeSingle();
         if(!lg2.error && lg2.data) currentLottery = lg2.data;
-        const wn2 = await supabaseClient.from('forum_lottery_winners')
-          .select('post_id,user_id,prize_name,prize_type,contact,claimed,claimed_at,code,user:profiles!forum_lottery_winners_user_id_fkey(id,nickname,username,uid,role,avatar_url)')
-          .eq('post_id', id);
+        const [wn2, dis2] = await Promise.all([
+          supabaseClient.from('forum_lottery_winners')
+            .select('post_id,user_id,prize_name,prize_type,contact,claimed,claimed_at,code,user:profiles!forum_lottery_winners_user_id_fkey(id,nickname,username,uid,role,avatar_url)')
+            .eq('post_id', id),
+          supabaseClient.rpc('get_lottery_winners', { p_post_id: id })
+        ]);
         currentLotteryWinners = (wn2.data || []).map(w => ({ ...w, user: w.user || {} }));
+        currentLotteryDisplayWinners = (dis2.data || []).map(w => ({ ...w, user: {
+          id: w.user_id, nickname: w.nickname, username: w.username, uid: w.uid, avatar_url: w.avatar_url
+        }}));
       }
     }
   }catch(e){ /* 抽奖数据加载失败不阻塞帖子查看 */ }
@@ -3216,10 +3229,10 @@ function renderLotteryCard(p){
     actionHtml = `<button class="btn" onclick="showLogin()">登录后参与抽奖</button>`;
   }
 
-  // 开奖按钮（定时模式：站长/管理员 或 楼主，进行中，未截止）
+  // 开奖按钮（定时模式：站长/管理员 或 楼主，进行中——截止前可提前开，截止后仍可手动开，防止无人访问卡死）
   let drawBtn = '';
-  if(isDrawing && !isInstant && canDraw && !expired){
-    drawBtn = `<button class="btn btn-ok btn-small" onclick="drawMyLottery()">🎲 手动开奖</button>`;
+  if(isDrawing && !isInstant && canDraw){
+    drawBtn = `<button class="btn btn-ok btn-small" onclick="drawMyLottery()">🎲 ${expired ? '立即开奖' : '手动开奖'}</button>`;
   }
 
   // 我的中奖卡（实体/虚拟都需先填具体信息/联系方式领取；虚拟奖品领取后展示兑换码）
@@ -3246,19 +3259,22 @@ function renderLotteryCard(p){
     }
   }
 
-  // 中奖名单（已开奖）
+  // 中奖名单（已开奖）—— 用脱敏 RPC 名单展示；仅管理层能看到联系方式
   let winnerHtml = '';
   if(!isDrawing){
-    if(currentLotteryWinners.length){
+    const displayWinners = currentLotteryDisplayWinners.length ? currentLotteryDisplayWinners : currentLotteryWinners;
+    if(displayWinners.length){
       winnerHtml = `<div class="lottery-winner-list">
-        ${currentLotteryWinners.map(w => {
+        ${displayWinners.map(w => {
           const u = w.user || {};
           const uname = escapeHtml(u.nickname || u.username || '神秘用户');
           const avatar = escapeHtml(u.avatar_url || DEFAULT_AVATAR);
           const claimedText = w.claimed
             ? `<span class="lw-claimed">✓ 已领取</span>`
             : `<span class="lw-status">未领取${w.prize_type==='physical' ? ' · 待填联系方式' : ''}</span>`;
-          const contact = w.contact ? `<span class="lw-contact">📞 ${escapeHtml(w.contact)}</span>` : '';
+          // 联系方式仅管理层可见（普通用户 RPC 不返回）
+          const contact = (isOwnerAdmin || (currentUser && p.author_id === currentUser.id)) && w.contact
+            ? `<span class="lw-contact">📞 ${escapeHtml(w.contact)}</span>` : '';
           return `<div class="lottery-winner-item">
             <img src="${avatar}" onerror="this.onerror=null;this.src='${DEFAULT_AVATAR}'">
             <span class="lw-name">${uname}</span>
@@ -3279,10 +3295,11 @@ function renderLotteryCard(p){
     quotaHtml = `<div class="lottery-quota">剩余名额：<b style="color:var(--pink-500)">${remain}</b> / ${maxEntries} 人${remain <= 0 ? '（已抽完）' : ''}</div>`;
   }
 
-  // ===== 参与者名单（仅 楼主/站长/管理员 可见，可剔除/禁止） =====
+  // ===== 参与者名单（仅 楼主/站长/管理员 可见；进行中可剔除/禁止，开奖后只读） =====
   let participantHtml = '';
-  if(isLtManager && isDrawing){
+  if(isLtManager){
     // 已参与人员
+    const canManage = isDrawing;
     const entriesRows = currentLotteryEntries.length ? currentLotteryEntries.map(e => {
       const u = e.user || {};
       const uname = escapeHtml(u.nickname || u.username || '神秘用户');
@@ -3297,8 +3314,8 @@ function renderLotteryCard(p){
         <span class="lp-uid">UID ${u.uid != null ? u.uid : '?'}</span>
         <span class="lp-time">${entryTime}</span>
         <span class="lp-ops">
-          ${isSelf ? '' : `<button class="btn btn-ghost btn-small" onclick="manageLotteryEntry('${e.user_id}','remove','${escapeHtml(uname)}')" title="剔除后恢复为未参与，可再次参与">↩️ 剔除</button>
-          <button class="btn btn-bad btn-small" onclick="manageLotteryEntry('${e.user_id}','ban','${escapeHtml(uname)}')" title="禁止参与本次抽奖">🚫 禁止</button>`}
+          ${(canManage && !isSelf) ? `<button class="btn btn-ghost btn-small" onclick="manageLotteryEntry('${e.user_id}','remove','${escapeHtml(uname)}')" title="剔除后恢复为未参与，可再次参与">↩️ 剔除</button>
+          <button class="btn btn-bad btn-small" onclick="manageLotteryEntry('${e.user_id}','ban','${escapeHtml(uname)}')" title="禁止参与本次抽奖">🚫 禁止</button>` : ''}
         </span>
       </div>`;
     }).join('') : '<div style="font-size:12px;color:var(--ink-400);padding:6px 0">还没有人参与喵</div>';
@@ -3313,7 +3330,7 @@ function renderLotteryCard(p){
         <span class="lp-uid">UID ${u.uid != null ? u.uid : '?'}</span>
         <span class="lp-time" style="color:#c0392b">🚫 已禁抽</span>
         <span class="lp-ops">
-          <button class="btn btn-ghost btn-small" onclick="manageLotteryEntry('${b.user_id}','unban','${uname}')" title="解除禁止，可再次参与">✅ 解禁</button>
+          ${canManage ? `<button class="btn btn-ghost btn-small" onclick="manageLotteryEntry('${b.user_id}','unban','${uname}')" title="解除禁止，可再次参与">✅ 解禁</button>` : ''}
         </span>
       </div>`;
     }).join('') : '';
@@ -3321,13 +3338,13 @@ function renderLotteryCard(p){
       <div class="lottery-participants" id="lotteryParticipantsBox" style="display:none">
         <div class="lottery-participants-head">
           <b>👥 参与者名单</b>
-          <span style="font-size:12px;color:var(--ink-400)">共 ${entryCount} 人${bannedCount ? ` · 已禁抽 ${bannedCount} 人` : ''}</span>
+          <span style="font-size:12px;color:var(--ink-400)">共 ${entryCount} 人${bannedCount ? ` · 已禁抽 ${bannedCount} 人` : ''}${!isDrawing ? '（已开奖，只读）' : ''}</span>
         </div>
         <div class="lottery-participants-list">
           ${entriesRows}
           ${banRows}
         </div>
-        <div style="font-size:11px;color:var(--ink-400);margin-top:6px">剔除后参与者恢复为未参与状态，可再次参与；禁止则本次抽奖都无法再参与喵。</div>
+        ${isDrawing ? '<div style="font-size:11px;color:var(--ink-400);margin-top:6px">剔除后参与者恢复为未参与状态，可再次参与；禁止则本次抽奖都无法再参与喵。</div>' : ''}
       </div>`;
   }
 
@@ -3342,7 +3359,7 @@ function renderLotteryCard(p){
     </div>
     <div class="lottery-actions">
       ${actionHtml}
-      ${isLtManager && isDrawing ? `<button class="btn btn-ghost btn-small" onclick="toggleLotteryParticipants()">👥 参与者名单</button>` : ''}
+      ${isLtManager ? `<button class="btn btn-ghost btn-small" onclick="toggleLotteryParticipants()">👥 参与者名单</button>` : ''}
       ${drawBtn}
     </div>
     ${myCard}
@@ -3469,7 +3486,7 @@ async function refreshLotteryData(){
     ['owner','admin'].includes(currentProfile.role) || currentForumPost.author_id === currentUser.id
   );
   try{
-    const [lg, en, wn, bans] = await Promise.all([
+    const [lg, en, wn, dis, bans] = await Promise.all([
       supabaseClient.from('forum_lotteries')
         .select('post_id,prizes,deadline,claim_note,status,winner_count,created_by,draw_mode,max_entries,entry_count,banned_count')
         .eq('post_id', id).maybeSingle(),
@@ -3479,6 +3496,7 @@ async function refreshLotteryData(){
       supabaseClient.from('forum_lottery_winners')
         .select('post_id,user_id,prize_name,prize_type,contact,claimed,claimed_at,code,user:profiles!forum_lottery_winners_user_id_fkey(id,nickname,username,uid,role,avatar_url)')
         .eq('post_id', id),
+      supabaseClient.rpc('get_lottery_winners', { p_post_id: id }),
       isLtManager
         ? supabaseClient.from('forum_lottery_bans')
             .select('post_id,user_id,created_at,user:profiles!forum_lottery_bans_user_id_fkey(id,nickname,username,uid,avatar_url)')
@@ -3488,6 +3506,9 @@ async function refreshLotteryData(){
     if(!lg.error && lg.data) currentLottery = lg.data;
     currentLotteryEntries = (en.data || []).map(e => ({ ...e, user: e.user || {} }));
     currentLotteryWinners = (wn.data || []).map(w => ({ ...w, user: w.user || {} }));
+    currentLotteryDisplayWinners = (dis.data || []).map(w => ({ ...w, user: {
+      id: w.user_id, nickname: w.nickname, username: w.username, uid: w.uid, avatar_url: w.avatar_url
+    }}));
     currentLotteryBans = (bans.data || []).map(b => ({ ...b, user: b.user || {} }));
   }catch(e){}
 }
@@ -3614,6 +3635,15 @@ function onLotteryModeChange(){
   document.getElementById('postLotteryHint').textContent = mode === 'instant'
     ? '即时开奖：参与者点「立即抽」当场出结果，抽中即得奖，名额抽完自动结束喵。'
     : '定时开奖：参与者先「参与抽奖」，到截止时间系统自动开奖，也可由你手动开奖喵。';
+  // 定时模式：默认预填 24 小时后，方便直接用
+  if(mode === 'scheduled'){
+    const d = document.getElementById('postLotteryDeadline');
+    if(d && !d.value){
+      const t = new Date(Date.now() + 24*3600*1000);
+      const pad = n => String(n).padStart(2,'0');
+      d.value = `${t.getFullYear()}-${pad(t.getMonth()+1)}-${pad(t.getDate())}T${pad(t.getHours())}:${pad(t.getMinutes())}`;
+    }
+  }
 }
 // 抽奖奖项行（动态增删）
 function addLotteryPrize(){
@@ -3744,6 +3774,11 @@ async function submitPost(){
         err.textContent = e.message; btn.disabled = false; btn.innerHTML = '发布'; return;
       }
       if(!prizes.length){ err.textContent = '抽奖贴至少要有一个有效的奖项喵'; btn.disabled = false; btn.innerHTML = '发布'; return; }
+      // 虚拟奖品缺兑换码提醒（防止明早大抽奖发布后才发现中奖者领不到码）
+      const noCodeVirtual = prizes.filter(p => p.type === 'virtual' && (!Array.isArray(p.codes) || !p.codes.length));
+      if(noCodeVirtual.length && !confirm(`「${noCodeVirtual.map(p => p.name).join('、')}」是虚拟奖品但没有填兑换码，中奖者领取后将看不到兑换码喵。确定要这样发布吗？`)){
+        btn.disabled = false; btn.innerHTML = '发布'; return;
+      }
       const r = await supabaseClient.rpc('create_lottery_post', {
         p_title: title, p_content: content, p_prizes: prizes,
         p_image_url: imageUrl, p_claim_note: claimNote,
