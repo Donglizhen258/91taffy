@@ -278,6 +278,34 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
 .post-field textarea{min-height:110px;resize:vertical;line-height:1.6}
 .post-author-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:6px}
 .post-author-row input[type=checkbox]{width:auto}
+/* 抽奖 */
+.lottery-prize-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap}
+.lottery-prize-row input[type=text]{flex:1;min-width:120px;padding:7px 9px;border:1px solid rgba(178,58,99,.4);border-radius:4px;font-size:13px;color:var(--ink-900);background:#fff;outline:none;box-sizing:border-box}
+.lottery-prize-row select{padding:7px 6px;border:1px solid rgba(178,58,99,.4);border-radius:4px;font-size:13px;color:var(--ink-900);background:#fff}
+.lottery-prize-row input[type=number]{width:64px;padding:7px 6px;border:1px solid rgba(178,58,99,.4);border-radius:4px;font-size:13px;color:var(--ink-900);background:#fff}
+.lottery-card{background:rgba(255,234,242,.5);border:1px solid rgba(212,83,126,.4);border-radius:10px;padding:16px;margin:14px 0}
+.lottery-card h4{margin:0 0 10px;font-size:15px;color:var(--pink-600)}
+.lottery-prizes{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
+.lottery-prize-item{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-700)}
+.lottery-prize-item .lp-tag{font-size:11px;padding:1px 7px;border-radius:3px;color:#fff;flex-shrink:0}
+.lp-virtual{background:linear-gradient(180deg,#7cc0f0,#3a8fd0)}
+.lp-physical{background:linear-gradient(180deg,#f0a04b,#d07a1f)}
+.lottery-meta{font-size:12px;color:var(--ink-400);margin-bottom:10px}
+.lottery-meta b{color:var(--ink-600)}
+.lottery-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.lottery-winner-list{display:flex;flex-direction:column;gap:8px}
+.lottery-winner-item{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--ink-700);flex-wrap:wrap}
+.lottery-winner-item img{width:26px;height:26px;border-radius:50%;object-fit:cover;flex-shrink:0}
+.lottery-winner-item .lw-name{font-weight:600}
+.lottery-winner-item .lw-prize{color:var(--pink-500)}
+.lottery-winner-item .lw-status{font-size:12px;color:var(--ink-400)}
+.lottery-winner-item .lw-claimed{font-size:12px;color:var(--ok);font-weight:600}
+.lottery-winner-item .lw-contact{font-size:12px;color:var(--ink-400)}
+.lottery-mycard{background:rgba(255,241,214,.5);border:1px dashed #e9a23b;border-radius:8px;padding:10px 12px;margin-top:10px;font-size:13px;color:var(--ink-700)}
+.lottery-mycard b{color:#c47f16}
+.f-lottery-badge{font-size:11px;padding:1px 7px;border-radius:3px;flex-shrink:0;color:#fff;
+  background:linear-gradient(180deg,#b78df5,#8b5cf6)}
+.lottery-num{font-size:12px;color:var(--ink-400)}
 
 /* 用户资料详情页 */
 .profile-head{display:flex;gap:16px;align-items:flex-start;margin-bottom:18px;flex-wrap:wrap}
@@ -769,6 +797,28 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
         <label style="margin:0;display:flex;align-items:center;gap:6px;cursor:pointer">
           <input type="checkbox" id="postAsAssistant"> 以「站内管家」(UID 1) 身份发布
         </label>
+      </div>
+    </div>
+    <div class="post-field" id="postLotteryRow" style="display:none">
+      <div class="post-author-row" style="margin-top:0">
+        <label style="margin:0;display:flex;align-items:center;gap:6px;cursor:pointer">
+          <input type="checkbox" id="postIsLottery" onchange="onPostLotteryToggle()"> 🎁 抽奖贴（可设多个奖项）
+        </label>
+      </div>
+      <div id="postLotteryConfig" style="display:none;margin-top:10px">
+        <div style="font-size:12px;color:var(--ink-400);margin-bottom:8px">
+          参与人点「参与抽奖」，开奖后由你点「开奖」随机抽取中奖者。虚拟奖品可直接领取，实体奖品需中奖人填联系方式领取。
+        </div>
+        <div id="lotteryPrizeList"></div>
+        <button class="btn btn-ghost btn-small" style="margin-top:6px" onclick="addLotteryPrize()">＋ 添加奖项</button>
+        <div class="post-author-row">
+          <label style="margin:0">参与截止时间（可选）</label>
+          <input type="datetime-local" id="postLotteryDeadline" style="padding:6px 8px;border:1px solid rgba(178,58,99,.4);border-radius:4px;font-size:13px;color:var(--ink-900);background:#fff">
+        </div>
+        <div class="post-field" style="margin-top:8px;margin-bottom:0">
+          <label>领奖方式说明（可选，实体奖品建议写清楚）</label>
+          <textarea id="postLotteryClaimNote" maxlength="500" placeholder="例如：中奖后请填 QQ/微信，包邮送到喵~" style="min-height:60px"></textarea>
+        </div>
       </div>
     </div>
     <button class="btn" id="postSubmitBtn" style="width:100%" onclick="submitPost()">发布</button>
@@ -2757,6 +2807,11 @@ let currentForumLZL = [];          // 当前帖子的楼中楼
 let forumLikedSet = new Set();     // 当前用户赞过的回帖 id
 let forumReplyTo = null;           // { id, name } 正在楼中楼回复的楼层
 let forumPostImgFile = null;       // 发帖配图文件
+let forumLotteryPrizeRows = 0;     // 发帖弹窗里已添加的奖项行数
+// 抽奖帖子数据缓存（列表关联 lottery 字段 + 详情页额外查询）
+let currentLottery = null;         // 当前帖子详情里的抽奖配置
+let currentLotteryEntries = [];    // 当前帖子参与记录（含作者）
+let currentLotteryWinners = [];    // 当前帖子中奖记录（含作者）
 
 // ===== 公告横幅（首页顶端） =====
 async function loadAnnouncement(){
@@ -2802,7 +2857,7 @@ async function loadForum(reset){
   list.innerHTML = `<div class="loading">加载中喵...</div>`;
   const { data, error } = await supabaseClient
     .from('forum_posts')
-    .select('id,title,content,image_url,author_id,post_type,is_pinned,is_essence,reply_count,last_reply_at,created_at,author:profiles!forum_posts_author_id_fkey(id,nickname,username,uid,role,avatar_url)')
+    .select('id,title,content,image_url,author_id,post_type,is_pinned,is_essence,reply_count,last_reply_at,created_at,lottery:forum_lotteries(post_id,status,prizes,deadline,winner_count,claim_note),author:profiles!forum_posts_author_id_fkey(id,nickname,username,uid,role,avatar_url)')
     .order('created_at', { ascending:false });
   if(error){
     list.innerHTML = `<div class="empty">加载失败：${zhErr(error.message)}</div>`;
@@ -2867,6 +2922,16 @@ function renderForumItem(p){
     ? '<span class="f-pin-badge f-pin-notice">📢 公告</span>'
     : (isPinned ? '<span class="f-pin-badge f-pin-top">📌 置顶</span>' : '');
   const essence = p.is_essence ? '<span class="f-essence-badge">⭐ 精</span>' : '';
+  // 抽奖徽标（lottery 关联存在即视为抽奖贴）
+  let lotteryBadge = '';
+  if(Array.isArray(p.lottery) && p.lottery.length){
+    const lt = p.lottery[0];
+    const statusText = lt.status === 'drawn'
+      ? '已开奖'
+      : (lt.deadline && new Date(lt.deadline).getTime() < Date.now() ? '已截止' : '进行中');
+    lotteryBadge = `<span class="f-lottery-badge" title="抽奖贴">🎁 抽奖</span>`;
+    if(lt.status === 'drawn') lotteryBadge = `<span class="f-lottery-badge" style="background:linear-gradient(180deg,#9aa5b1,#6b7683)" title="已开奖">🎁 已开奖</span>`;
+  }
   const lastTime = p.last_reply_at ? fmtTime(p.last_reply_at) : '';
   const lastText = p.last_reply_at
     ? `最后回复 ${lastTime}`
@@ -2874,7 +2939,7 @@ function renderForumItem(p){
   return `
   <div class="forum-item">
     <div class="f-item-main">
-      <div class="f-item-title" onclick="openForumPost('${p.id}')">${badge}${essence} ${escapeHtml(p.title)}</div>
+      <div class="f-item-title" onclick="openForumPost('${p.id}')">${badge}${lotteryBadge}${essence} ${escapeHtml(p.title)}</div>
       <div class="f-item-meta">
         <span class="f-author"><img src="${escapeHtml(author.avatar_url || DEFAULT_AVATAR)}" alt="" loading="lazy" onerror="this.onerror=null;this.src='${DEFAULT_AVATAR}'">${name}</span>
         <span>UID ${author.uid != null ? author.uid : '?'}</span>
@@ -2901,6 +2966,26 @@ async function openForumPost(id){
     return;
   }
   currentForumPost = data;
+  // 加载抽奖数据（抽奖贴）
+  currentLottery = null;
+  currentLotteryEntries = [];
+  currentLotteryWinners = [];
+  try{
+    const [lg, en, wn] = await Promise.all([
+      supabaseClient.from('forum_lotteries')
+        .select('post_id,prizes,deadline,claim_note,status,winner_count,created_by')
+        .eq('post_id', id).maybeSingle(),
+      supabaseClient.from('forum_lottery_entries')
+        .select('post_id,user_id,created_at,user:profiles!forum_lottery_entries_user_id_fkey(id,nickname,username,uid,avatar_url)')
+        .eq('post_id', id),
+      supabaseClient.from('forum_lottery_winners')
+        .select('post_id,user_id,prize_name,prize_type,contact,claimed,claimed_at,user:profiles!forum_lottery_winners_user_id_fkey(id,nickname,username,uid,avatar_url)')
+        .eq('post_id', id)
+    ]);
+    if(!lg.error && lg.data) currentLottery = lg.data;
+    currentLotteryEntries = (en.data || []).map(e => ({ ...e, user: e.user || {} }));
+    currentLotteryWinners = (wn.data || []).map(w => ({ ...w, user: w.user || {} }));
+  }catch(e){ /* 抽奖数据加载失败不阻塞帖子查看 */ }
   // 加载回帖
   const [r1, r2] = await Promise.all([
     supabaseClient.from('forum_replies')
@@ -2987,13 +3072,202 @@ function renderForumPost(){
         <button class="btn" onclick="showRegister()">注册</button>
       </div>
     </div>`;
+  // 抽奖卡片（若为抽奖贴）
+  const lotteryHtml = currentLottery ? renderLotteryCard(p) : '';
   body.innerHTML = `
     <div class="forum-post-title">${typeBadge}${pinBadge}${essenceBadge} ${escapeHtml(p.title)}</div>
     <div class="forum-post-meta"><span>共 ${currentForumReplies.length} 条回帖</span></div>
     ${lzHtml}
+    ${lotteryHtml}
     <div class="fp-floor-head">回帖楼层</div>
     ${repliesHtml}
     ${replyBox}`;
+}
+
+// ===== 抽奖贴卡片 =====
+function renderLotteryCard(p){
+  const lt = currentLottery;
+  const isDrawing = lt.status === 'drawing';
+  const now = Date.now();
+  const expired = lt.deadline && new Date(lt.deadline).getTime() < now;
+  const isOwnerAdmin = currentProfile && ['owner','admin'].includes(currentProfile.role);
+  const canDraw = isOwnerAdmin || (currentUser && p.author_id === currentUser.id);
+  // 参与者数量（entries 可能含用户信息）
+  const entryCount = currentLotteryEntries.length;
+  // 当前用户是否已参与
+  const myEntry = currentUser && currentLotteryEntries.some(e => e.user_id === currentUser.id);
+  // 当前用户中奖记录
+  const myWin = currentUser && currentLotteryWinners.find(w => w.user_id === currentUser.id);
+  // 奖品列表
+  const prizes = Array.isArray(lt.prizes) ? lt.prizes : [];
+  const prizeHtml = prizes.length ? prizes.map(pr => `
+    <div class="lottery-prize-item">
+      <span class="lp-tag ${pr.type === 'virtual' ? 'lp-virtual' : 'lp-physical'}">${pr.type === 'virtual' ? '虚拟' : '实体'}</span>
+      <span><b>${escapeHtml(pr.name)}</b> × ${pr.count} 名</span>
+    </div>`).join('') : '<div style="font-size:12px;color:var(--ink-400)">未设置奖品</div>';
+  // 截止时间
+  const deadlineText = lt.deadline
+    ? (isDrawing && expired ? '已截止' : '截止 ' + new Date(lt.deadline).toLocaleString('zh-CN'))
+    : '不设截止';
+  const statusBadge = isDrawing
+    ? (expired ? '<span class="f-pin-badge f-pin-top">⏰ 已截止</span>' : '<span class="f-lottery-badge">🎁 进行中</span>')
+    : '<span class="f-lottery-badge" style="background:linear-gradient(180deg,#9aa5b1,#6b7683)">🎁 已开奖</span>';
+
+  // 参与/取消按钮（开奖前，未过期）
+  let actionHtml = '';
+  if(isDrawing && currentUser){
+    if(expired){
+      actionHtml = `<span class="lottery-num">已截止参与喵</span>`;
+    } else if(myEntry){
+      actionHtml = `
+        <span class="lottery-num" style="color:var(--ok);font-weight:600">✓ 已参与</span>
+        <button class="btn btn-ghost btn-small" onclick="cancelMyLottery()">取消参与</button>`;
+    } else {
+      actionHtml = `<button class="btn" onclick="enterMyLottery()">🎲 参与抽奖</button>`;
+    }
+  } else if(isDrawing && !currentUser){
+    actionHtml = `<button class="btn" onclick="showLogin()">登录后参与抽奖</button>`;
+  }
+
+  // 开奖按钮（站长/管理员 或 楼主，进行中）
+  let drawBtn = '';
+  if(isDrawing && canDraw && !expired){
+    drawBtn = `<button class="btn btn-ok btn-small" onclick="drawMyLottery()">🎲 开奖</button>`;
+  }
+
+  // 我的中奖卡（虚拟直接领取 / 实体填联系方式）
+  let myCard = '';
+  if(myWin){
+    const w = myWin;
+    if(w.claimed){
+      myCard = `<div class="lottery-mycard">🎉 恭喜中奖「<b>${escapeHtml(w.prize_name)}</b>」！已领取喵 ${w.claimed_at ? '（'+new Date(w.claimed_at).toLocaleString('zh-CN')+'）' : ''}</div>`;
+    } else if(w.prize_type === 'physical'){
+      myCard = `<div class="lottery-mycard">
+        🎉 恭喜中奖「<b>${escapeHtml(w.prize_name)}</b>」！这是实体奖品，请填写联系方式（QQ/微信/电话）领取喵：<br>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <input type="text" id="lotteryContactInput" placeholder="填写 QQ / 微信 / 电话" style="flex:1;padding:8px 10px;border:1px solid rgba(178,58,99,.4);border-radius:4px;font-size:13px;color:var(--ink-900);background:#fff;outline:none">
+          <button class="btn btn-small" onclick="claimMyLottery()">确认领取</button>
+        </div>
+      </div>`;
+    } else {
+      myCard = `<div class="lottery-mycard">
+        🎉 恭喜中奖「<b>${escapeHtml(w.prize_name)}</b>」！这是虚拟奖品，点击即可领取喵：<br>
+        <button class="btn btn-small" style="margin-top:8px" onclick="claimMyLottery()">立即领取</button>
+      </div>`;
+    }
+  }
+
+  // 中奖名单（已开奖）
+  let winnerHtml = '';
+  if(!isDrawing){
+    if(currentLotteryWinners.length){
+      winnerHtml = `<div class="lottery-winner-list">
+        ${currentLotteryWinners.map(w => {
+          const u = w.user || {};
+          const uname = escapeHtml(u.nickname || u.username || '神秘用户');
+          const avatar = escapeHtml(u.avatar_url || DEFAULT_AVATAR);
+          const claimedText = w.claimed
+            ? `<span class="lw-claimed">✓ 已领取</span>`
+            : `<span class="lw-status">未领取${w.prize_type==='physical' ? ' · 待填联系方式' : ''}</span>`;
+          const contact = w.contact ? `<span class="lw-contact">📞 ${escapeHtml(w.contact)}</span>` : '';
+          return `<div class="lottery-winner-item">
+            <img src="${avatar}" onerror="this.onerror=null;this.src='${DEFAULT_AVATAR}'">
+            <span class="lw-name">${uname}</span>
+            <span class="lw-prize">🏆 ${escapeHtml(w.prize_name)}</span>
+            ${claimedText}${contact}
+          </div>`;
+        }).join('')}
+      </div>`;
+    } else {
+      winnerHtml = `<div style="font-size:13px;color:var(--ink-400)">本轮无人中奖（无人参与）喵</div>`;
+    }
+  }
+
+  return `<div class="lottery-card">
+    <h4>${statusBadge} 抽奖活动</h4>
+    <div class="lottery-prizes">${prizeHtml}</div>
+    <div class="lottery-meta">
+      参与人数：<b>${entryCount}</b> 人 · 中奖名额：<b>${lt.winner_count || '待开奖'}</b> · ${deadlineText}
+      ${lt.claim_note ? `<br>🎁 ${escapeHtml(lt.claim_note)}` : ''}
+    </div>
+    <div class="lottery-actions">
+      ${actionHtml}
+      ${drawBtn}
+    </div>
+    ${myCard}
+    ${winnerHtml}
+  </div>`;
+}
+
+// 参与抽奖
+async function enterMyLottery(){
+  if(!currentUser){ alert('请先登录喵'); return; }
+  if(!currentLottery || !currentForumPost) return;
+  const { error } = await supabaseClient.rpc('enter_lottery', { p_post_id: currentForumPost.id });
+  if(error){ alert(zhErr(error.message)); return; }
+  await refreshLotteryData();
+  renderForumPost();
+}
+// 取消参与
+async function cancelMyLottery(){
+  if(!currentUser || !currentForumPost) return;
+  if(!confirm('确定取消参与这个抽奖吗喵？')) return;
+  const { error } = await supabaseClient.rpc('cancel_lottery_entry', { p_post_id: currentForumPost.id });
+  if(error){ alert(zhErr(error.message)); return; }
+  await refreshLotteryData();
+  renderForumPost();
+}
+// 开奖
+async function drawMyLottery(){
+  if(!currentForumPost) return;
+  const prizes = Array.isArray(currentLottery && currentLottery.prizes) ? currentLottery.prizes : [];
+  const total = prizes.reduce((s, p) => s + (p.count || 0), 0);
+  if(!confirm(`确定现在开奖吗喵？将从参与名单中随机抽取中奖者（奖品共 ${total} 个名额）。开奖后不可撤销喵！`)) return;
+  const { error } = await supabaseClient.rpc('draw_lottery', { p_post_id: currentForumPost.id });
+  if(error){ alert(zhErr(error.message)); return; }
+  alert('开奖完成喵！🎉');
+  await refreshLotteryData();
+  renderForumPost();
+}
+// 领取奖品（虚拟直接领 / 实体需填联系方式）
+async function claimMyLottery(){
+  if(!currentUser || !currentForumPost) return;
+  const myWin = currentLotteryWinners.find(w => w.user_id === currentUser.id);
+  if(!myWin) return;
+  let contact = '';
+  if(myWin.prize_type === 'physical'){
+    const input = document.getElementById('lotteryContactInput');
+    contact = input ? input.value.trim() : '';
+    if(!contact){ alert('请填写联系方式（QQ/微信/电话等）喵'); return; }
+  }
+  const { error } = await supabaseClient.rpc('claim_lottery_prize', {
+    p_post_id: currentForumPost.id, p_contact: contact
+  });
+  if(error){ alert(zhErr(error.message)); return; }
+  alert('领取成功喵！🎉');
+  await refreshLotteryData();
+  renderForumPost();
+}
+// 刷新抽奖数据
+async function refreshLotteryData(){
+  if(!currentForumPost) return;
+  const id = currentForumPost.id;
+  try{
+    const [lg, en, wn] = await Promise.all([
+      supabaseClient.from('forum_lotteries')
+        .select('post_id,prizes,deadline,claim_note,status,winner_count,created_by')
+        .eq('post_id', id).maybeSingle(),
+      supabaseClient.from('forum_lottery_entries')
+        .select('post_id,user_id,created_at,user:profiles!forum_lottery_entries_user_id_fkey(id,nickname,username,uid,avatar_url)')
+        .eq('post_id', id),
+      supabaseClient.from('forum_lottery_winners')
+        .select('post_id,user_id,prize_name,prize_type,contact,claimed,claimed_at,user:profiles!forum_lottery_winners_user_id_fkey(id,nickname,username,uid,avatar_url)')
+        .eq('post_id', id)
+    ]);
+    if(!lg.error && lg.data) currentLottery = lg.data;
+    currentLotteryEntries = (en.data || []).map(e => ({ ...e, user: e.user || {} }));
+    currentLotteryWinners = (wn.data || []).map(w => ({ ...w, user: w.user || {} }));
+  }catch(e){}
 }
 function renderForumReply(r, post){
   const author = r.author || {};
@@ -3074,12 +3348,53 @@ function showPostModal(){
   document.getElementById('postTitle').value = '';
   document.getElementById('postContent').value = '';
   document.getElementById('postError').textContent = '';
+  // 抽奖：仅站长/管理员可发起
+  document.getElementById('postLotteryRow').style.display = isAdmin ? '' : 'none';
+  const ltCk = document.getElementById('postIsLottery');
+  ltCk.checked = false;
+  document.getElementById('postLotteryConfig').style.display = 'none';
+  document.getElementById('postLotteryDeadline').value = '';
+  document.getElementById('postLotteryClaimNote').value = '';
+  document.getElementById('lotteryPrizeList').innerHTML = '';
+  forumLotteryPrizeRows = 0;
+  addLotteryPrize(); // 默认一个空奖项行
   removePostImg();
   document.getElementById('postModal').classList.add('show');
 }
 function onPostTypeChange(){
   const t = document.getElementById('postType').value;
   document.getElementById('postAsRow').style.display = t === 'notice' ? '' : 'none';
+}
+function onPostLotteryToggle(){
+  const on = document.getElementById('postIsLottery').checked;
+  document.getElementById('postLotteryConfig').style.display = on ? '' : 'none';
+}
+// 抽奖奖项行（动态增删）
+function addLotteryPrize(){
+  const wrap = document.getElementById('lotteryPrizeList');
+  const row = document.createElement('div');
+  row.className = 'lottery-prize-row';
+  row.innerHTML = `
+    <input type="text" placeholder="奖品名（如：塔菲徽章）">
+    <select>
+      <option value="virtual">虚拟</option>
+      <option value="physical">实体</option>
+    </select>
+    <input type="number" min="1" value="1" style="width:64px" title="中奖名额">
+    <button class="x" onclick="this.parentNode.remove()" title="删除该奖项">×</button>`;
+  wrap.appendChild(row);
+  forumLotteryPrizeRows++;
+}
+function collectLotteryPrizes(){
+  const rows = document.querySelectorAll('#lotteryPrizeList .lottery-prize-row');
+  const prizes = [];
+  rows.forEach(r => {
+    const name = r.querySelector('input[type=text]').value.trim();
+    const type = r.querySelector('select').value;
+    const count = parseInt(r.querySelector('input[type=number]').value, 10) || 1;
+    if(name) prizes.push({ name, type, count });
+  });
+  return prizes;
 }
 function handlePostImg(event){
   const file = event.target.files[0];
@@ -3109,6 +3424,9 @@ async function submitPost(){
   if(!content){ err.textContent = '请填写正文喵'; return; }
   const type = document.getElementById('postType').value;
   const asAssistant = document.getElementById('postAsAssistant') && document.getElementById('postAsAssistant').checked;
+  const isLottery = document.getElementById('postIsLottery') && document.getElementById('postIsLottery').checked;
+  const prizes = isLottery ? collectLotteryPrizes() : [];
+  if(isLottery && !prizes.length){ err.textContent = '抽奖贴至少要有一个有效的奖项喵'; return; }
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> 发布中…';
   err.textContent = '';
@@ -3122,13 +3440,30 @@ async function submitPost(){
       const { data: { publicUrl } } = supabaseClient.storage.from('comment-images').getPublicUrl(path);
       imageUrl = publicUrl;
     }
-    const { data, error } = await supabaseClient.rpc('create_forum_post', {
-      p_title: title, p_content: content, p_image_url: imageUrl,
-      p_type: type, p_as_assistant: asAssistant
-    });
-    if(error) throw new Error(zhErr(error.message));
+    let data;
+    if(isLottery){
+      // 抽奖贴：走 create_lottery_post（内部创建帖子 + 抽奖配置）
+      let deadline = null;
+      const dv = document.getElementById('postLotteryDeadline').value;
+      if(dv) deadline = new Date(dv).toISOString();
+      const claimNote = document.getElementById('postLotteryClaimNote').value.trim();
+      const r = await supabaseClient.rpc('create_lottery_post', {
+        p_title: title, p_content: content, p_prizes: prizes,
+        p_image_url: imageUrl, p_deadline: deadline,
+        p_claim_note: claimNote, p_as_assistant: asAssistant
+      });
+      if(r.error) throw new Error(zhErr(r.error.message));
+      data = r.data;
+    } else {
+      const { data: d, error } = await supabaseClient.rpc('create_forum_post', {
+        p_title: title, p_content: content, p_image_url: imageUrl,
+        p_type: type, p_as_assistant: asAssistant
+      });
+      if(error) throw new Error(zhErr(error.message));
+      data = d;
+    }
     closeModal('postModal');
-    alert('帖子发布成功喵！');
+    alert(isLottery ? '抽奖贴发布成功喵！🎉' : '帖子发布成功喵！');
     await loadForum(true);
     await loadAnnouncement();
     openForumPost(data);
@@ -3242,6 +3577,7 @@ async function refreshCurrentPost(){
     .select('id,title,content,image_url,author_id,post_type,is_pinned,is_essence,reply_count,last_reply_at,created_at,author:profiles!forum_posts_author_id_fkey(id,nickname,username,uid,role,avatar_url)')
     .eq('id', currentForumPost.id).maybeSingle();
   if(!error && data) currentForumPost = data;
+  await refreshLotteryData();
   renderForumPost();
   loadForum(true);
 }
