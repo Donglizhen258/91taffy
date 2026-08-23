@@ -3186,7 +3186,7 @@ function renderLotteryCard(p){
     drawBtn = `<button class="btn btn-ok btn-small" onclick="drawMyLottery()">🎲 手动开奖</button>`;
   }
 
-  // 我的中奖卡（虚拟：领取后显示兑换码 / 实体：填联系方式）
+  // 我的中奖卡（实体/虚拟都需先填具体信息/联系方式领取；虚拟奖品领取后展示兑换码）
   let myCard = '';
   if(myWin){
     const w = myWin;
@@ -3196,19 +3196,16 @@ function renderLotteryCard(p){
         ? `<div class="lottery-code-box">🔑 兑换码：<b class="lottery-code" id="myCode">${escapeHtml(w.code)}</b>
              <button class="btn btn-ghost btn-small" onclick="copyLotteryCode()">📋 复制</button></div>`
         : '';
-      myCard = `<div class="lottery-mycard">🎉 恭喜中奖「<b>${escapeHtml(w.prize_name)}</b>」！已领取喵 ${w.claimed_at ? '（'+new Date(w.claimed_at).toLocaleString('zh-CN')+'）' : ''}${codeBox}</div>`;
-    } else if(w.prize_type === 'physical'){
+      const contactText = w.contact ? `<div style="font-size:12px;color:var(--ink-400);margin-top:4px">📞 已登记联系方式：${escapeHtml(w.contact)}</div>` : '';
+      myCard = `<div class="lottery-mycard">🎉 恭喜中奖「<b>${escapeHtml(w.prize_name)}</b>」！已领取喵 ${w.claimed_at ? '（'+new Date(w.claimed_at).toLocaleString('zh-CN')+'）' : ''}${codeBox}${contactText}</div>`;
+    } else {
+      const typeText = w.prize_type === 'physical' ? '这是实体奖品' : '这是虚拟奖品，领取后即可看到兑换码';
       myCard = `<div class="lottery-mycard">
-        🎉 恭喜中奖「<b>${escapeHtml(w.prize_name)}</b>」！这是实体奖品，请填写联系方式（QQ/微信/电话）领取喵：<br>
+        🎉 恭喜中奖「<b>${escapeHtml(w.prize_name)}</b>」！${typeText}，请先填写你的具体信息/联系方式（QQ/微信/电话等）领取喵：<br>
         <div style="display:flex;gap:8px;margin-top:8px">
-          <input type="text" id="lotteryContactInput" placeholder="填写 QQ / 微信 / 电话" style="flex:1;padding:8px 10px;border:1px solid rgba(178,58,99,.4);border-radius:4px;font-size:13px;color:var(--ink-900);background:#fff;outline:none">
+          <input type="text" id="lotteryContactInput" placeholder="填写 QQ / 微信 / 电话 / 收货信息" style="flex:1;padding:8px 10px;border:1px solid rgba(178,58,99,.4);border-radius:4px;font-size:13px;color:var(--ink-900);background:#fff;outline:none">
           <button class="btn btn-small" onclick="claimMyLottery()">确认领取</button>
         </div>
-      </div>`;
-    } else {
-      myCard = `<div class="lottery-mycard">
-        🎉 恭喜中奖「<b>${escapeHtml(w.prize_name)}</b>」！这是虚拟奖品，点击领取后即可看到兑换码喵：<br>
-        <button class="btn btn-small" style="margin-top:8px" onclick="claimMyLottery()">立即领取</button>
       </div>`;
     }
   }
@@ -3290,9 +3287,9 @@ async function drawInstant(){
   if(error){ alert(zhErr(error.message)); return; }
   if(data && data.won){
     if(data.prize_type === 'virtual' && data.code){
-      alert(`🎉 恭喜中奖「${data.prize_name}」！\n\n🔑 兑换码：${data.code}\n\n已为你自动领取，快去复制兑换吧喵！`);
+      alert(`🎉 恭喜中奖「${data.prize_name}」！\n\n请在卡片上填写你的联系方式领取后，即可查看兑换码喵！`);
     } else if(data.prize_type === 'physical'){
-      alert(`🎉 恭喜中奖「${data.prize_name}」！\n\n请填写联系方式领取实体奖品喵！`);
+      alert(`🎉 恭喜中奖「${data.prize_name}」！\n\n请填写具体信息/联系方式领取实体奖品喵！`);
     } else {
       alert(`🎉 恭喜中奖「${data.prize_name}」！`);
     }
@@ -3339,12 +3336,9 @@ async function claimMyLottery(){
   if(!currentUser || !currentForumPost) return;
   const myWin = currentLotteryWinners.find(w => w.user_id === currentUser.id);
   if(!myWin) return;
-  let contact = '';
-  if(myWin.prize_type === 'physical'){
-    const input = document.getElementById('lotteryContactInput');
-    contact = input ? input.value.trim() : '';
-    if(!contact){ alert('请填写联系方式（QQ/微信/电话等）喵'); return; }
-  }
+  const input = document.getElementById('lotteryContactInput');
+  const contact = input ? input.value.trim() : '';
+  if(!contact){ alert('请先填写你的具体信息/联系方式（QQ/微信/电话等）才能领取喵'); return; }
   const { error } = await supabaseClient.rpc('claim_lottery_prize', {
     p_post_id: currentForumPost.id, p_contact: contact
   });
@@ -3511,7 +3505,7 @@ function addLotteryPrize(){
     </select>
     <input type="number" min="1" value="1" style="width:64px" title="中奖名额">
     <button class="x" onclick="this.parentNode.remove()" title="删除该奖项">×</button>
-    <div class="lottery-prize-codes" style="display:none;width:100%">
+    <div class="lottery-prize-codes" style="width:100%">
       <div class="lpc-title">🔑 兑换码（每行一个，数量需 ≥ 中奖名额）</div>
       <textarea placeholder="例如：&#10;ABCD-1234-EFGH&#10;WXYZ-5678-IJKL" title="每个中奖者会拿到一个兑换码"></textarea>
       <div class="lpc-tip">抽中虚拟奖品的人领取后能看到兑换码并复制去兑换喵。</div>
