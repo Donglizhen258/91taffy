@@ -302,6 +302,11 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
   border:1px solid rgba(212,83,126,.4);border-radius:8px;padding:16px;margin-bottom:18px;
   box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 3px 10px rgba(178,58,99,.15)}
 .admin-panel h3{font-size:16px;color:var(--ink-600);margin-bottom:12px}
+.admin-toolbar{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.admin-toolbar .search-input{flex:1;min-width:180px;padding:7px 12px;font-size:13px;border:1px solid rgba(178,58,99,.4);border-radius:6px;background:var(--bg);color:var(--ink-700);outline:none}
+.admin-toolbar .search-input:focus{border-color:var(--pink-500);box-shadow:0 0 0 2px rgba(212,83,126,.2)}
+.admin-toolbar .search-input::placeholder{color:var(--ink-400)}
+.admin-count{font-size:12px;color:var(--ink-400);margin-left:auto;white-space:nowrap}
 .user-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
 .user-row .u-name{font-weight:600;font-size:14px}
 .user-row .u-meta{font-size:12px;color:var(--ink-400)}
@@ -598,7 +603,13 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
       <!-- 管理面板（站长/管理员可见） -->
       <div class="admin-panel" id="adminPanel" style="display:none">
         <h3 id="adminTitle">管理面板</h3>
+        <div class="admin-toolbar">
+          <input id="adminSearchInput" class="search-input" type="text" placeholder="按 UID 或账户名 / 昵称 / 邮箱检索，回车确认" oninput="adminSearchChanged(this.value)">
+          <button class="btn btn-small" onclick="adminSearchClear()">清除</button>
+          <span class="admin-count" id="adminUserCount"></span>
+        </div>
         <div id="adminUserList"><div class="loading">加载中喵...</div></div>
+        <div id="adminUserPager" class="pager" style="display:none"></div>
       </div>
       <!-- 已删除 uid 冻结/回调区（站长可见） -->
       <div class="admin-panel" id="deletedUidPanel" style="display:none">
@@ -2410,6 +2421,12 @@ async function unbanUser(){
 // ========== 管理面板（站长/管理员） ==========
 let adminDetailUser = null;
 let adminPanelPending = false;
+// 管理面板成员列表：全量缓存 + 检索 + 分页（10 个一页）
+let adminAllUsers = [];      // RPC 拉取的全量用户（含 auth 状态）
+let adminSearchText = '';    // 当前检索关键词（UID / 账户名 / 昵称 / 邮箱）
+let adminPage = 1;           // 当前页码
+const ADMIN_PAGE_SIZE = 10;  // 每页 10 个
+
 async function renderAdminPanel(){
   // 防并发：同一时刻只允许一个加载任务，避免登录/会话恢复重复触发多个请求
   if(adminPanelPending) return;
@@ -2431,39 +2448,131 @@ async function renderAdminPanel(){
     if(fb.error){ list.innerHTML = `<div class="empty">加载失败：${zhErr(error ? error.message : fb.error.message)}</div>`; return; }
     data = fb.data;
   }
-  list.innerHTML = data.map(u => {
-    const roleText = u.role==='owner'?'站长':u.role==='admin'?'管理员':'用户';
-    const canManage = isOwner ? u.role !== 'owner' : u.role === 'user';
-    const isBanned = u.status === 'banned';
-    const banTag = isBanned ? ' <span class="ban-tag">（已封禁）</span>' : '';
-    const authTag = u.email_confirmed === false
-      ? ' <span class="ban-tag">（未验证邮箱）</span>' : '';
-    let btns = `<button class="btn btn-ghost btn-small" onclick="openUserDetail('${u.id}')">详情</button>`;
-    if(canManage){
-      if(isOwner && u.role === 'admin'){
-        btns += `<button class="btn btn-ghost btn-small" onclick="setRole('${u.id}','user')">取消管理员</button>`;
-      } else if(isOwner && u.role === 'user'){
-        btns += `<button class="btn btn-ok btn-small" onclick="setRole('${u.id}','admin')">任命管理员</button>`;
+  adminAllUsers = data || [];
+  adminPage = 1;
+  renderAdminUserRows(isOwner, list);
+  // 站长可见「已删除 uid 列表」，管理员也可查看
+  await renderDeletedUids();
+  }finally{ adminPanelPending = false; }
+}
+
+// 按当前检索关键词过滤用户（UID / 账户名 / 昵称 / 邮箱）
+function adminFilterUsers(list, kw){
+  kw = (kw == null ? adminSearchText : kw).trim().toLowerCase();
+  if(!kw) return list || adminAllUsers;
+  return (list || adminAllUsers).filter(u => {
+    const uidMatch = u.uid != null && String(u.uid).toLowerCase().includes(kw);
+    const nameMatch = (u.nickname||'').toLowerCase().includes(kw);
+    const userMatch = (u.username||'').toLowerCase().includes(kw);
+    const emailMatch = (u.email||'').toLowerCase().includes(kw);
+    return uidMatch || nameMatch || userMatch || emailMatch;
+  });
+}
+
+// 渲染当前页成员行（按检索过滤 + 分页）
+function renderAdminUserRows(isOwner, list){
+  if(!list) list = document.getElementById('adminUserList');
+  if(isOwner === undefined) isOwner = currentProfile && currentProfile.role === 'owner';
+  const kw = adminSearchText.trim().toLowerCase();
+  const filtered = adminFilterUsers(adminAllUsers, kw);
+  const total = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(total / ADMIN_PAGE_SIZE));
+  if(adminPage > totalPages) adminPage = totalPages;
+  if(adminPage < 1) adminPage = 1;
+  const start = (adminPage - 1) * ADMIN_PAGE_SIZE;
+  const pageUsers = filtered.slice(start, start + ADMIN_PAGE_SIZE);
+  const countEl = document.getElementById('adminUserCount');
+  if(countEl) countEl.textContent = kw
+    ? `检索到 ${total} 位成员`
+    : `共 ${total} 位成员`;
+  if(!pageUsers.length){
+    list.innerHTML = `<div class="empty">${kw ? '没有匹配的成员喵，换个关键词试试' : '暂无用户喵'}</div>`;
+  } else {
+    list.innerHTML = pageUsers.map(u => {
+      const roleText = u.role==='owner'?'站长':u.role==='admin'?'管理员':'用户';
+      const canManage = isOwner ? u.role !== 'owner' : u.role === 'user';
+      const isBanned = u.status === 'banned';
+      const banTag = isBanned ? ' <span class="ban-tag">（已封禁）</span>' : '';
+      const authTag = u.email_confirmed === false
+        ? ' <span class="ban-tag">（未验证邮箱）</span>' : '';
+      let btns = `<button class="btn btn-ghost btn-small" onclick="openUserDetail('${u.id}')">详情</button>`;
+      if(canManage){
+        if(isOwner && u.role === 'admin'){
+          btns += `<button class="btn btn-ghost btn-small" onclick="setRole('${u.id}','user')">取消管理员</button>`;
+        } else if(isOwner && u.role === 'user'){
+          btns += `<button class="btn btn-ok btn-small" onclick="setRole('${u.id}','admin')">任命管理员</button>`;
+        }
+        if(isBanned){
+          btns += `<button class="btn btn-ok btn-small" onclick="setStatus('${u.id}','active')">解封</button>`;
+        } else {
+          btns += `<button class="btn btn-bad btn-small" onclick="setStatus('${u.id}','banned')">永久封禁</button>`;
+          btns += `<button class="btn btn-bad btn-small" onclick="banUserDays('${u.id}')">自定义天数封禁</button>`;
+        }
+        btns += `<button class="btn btn-bad btn-small" onclick="deleteAccount('${u.id}','${escapeHtml(u.nickname||u.username)}')">删除账户</button>`;
       }
-      if(isBanned){
-        btns += `<button class="btn btn-ok btn-small" onclick="setStatus('${u.id}','active')">解封</button>`;
-      } else {
-        btns += `<button class="btn btn-bad btn-small" onclick="setStatus('${u.id}','banned')">永久封禁</button>`;
-        btns += `<button class="btn btn-bad btn-small" onclick="banUserDays('${u.id}')">自定义天数封禁</button>`;
-      }
-      btns += `<button class="btn btn-bad btn-small" onclick="deleteAccount('${u.id}','${escapeHtml(u.nickname||u.username)}')">删除账户</button>`;
-    }
-    return `<div class="user-row">
+      return `<div class="user-row">
       <span class="u-name">${escapeHtml(u.nickname||u.username)}</span>
       <span class="uid-badge">UID ${u.uid}</span>
       <span class="role-badge ${u.role==='owner'?'role-owner':u.role==='admin'?'role-admin':'role-user'}">${roleText}</span>
       <span class="u-meta">${u.status==='banned'?'<b style="color:var(--bad)">已封禁</b>':u.status}${u.email?(' · '+escapeHtml(u.email)):''}${authTag}${banTag} · ${new Date(u.created_at).toLocaleDateString('zh-CN')}</span>
       <span style="display:flex;gap:6px;flex-wrap:wrap">${btns}</span>
     </div>`;
-  }).join('');
-  // 站长可见「已删除 uid 列表」，管理员也可查看
-  await renderDeletedUids();
-  }finally{ adminPanelPending = false; }
+    }).join('');
+  }
+  renderAdminPager(totalPages, kw);
+}
+
+// 管理面板分页条
+function renderAdminPager(totalPages, kw){
+  const pager = document.getElementById('adminUserPager');
+  if(!pager) return;
+  if(totalPages <= 1){ pager.style.display = 'none'; return; }
+  pager.style.display = 'flex';
+  const prevDisabled = adminPage <= 1;
+  const nextDisabled = adminPage >= totalPages;
+  pager.innerHTML = `
+    <button class="pager-btn" ${prevDisabled ? 'disabled' : ''} onclick="adminGoPage(${adminPage-1})">上一页</button>
+    <span class="pager-info">第 ${adminPage} / ${totalPages} 页</span>
+    <button class="pager-btn" ${nextDisabled ? 'disabled' : ''} onclick="adminGoPage(${adminPage+1})">下一页</button>
+    <span class="pager-jump">跳转
+      <input id="adminPagerJumpInput" class="pager-input" type="number" min="1" max="${totalPages}" placeholder="${adminPage}" onkeydown="if(event.key==='Enter')adminJumpPage()">
+      <button class="pager-btn" onclick="adminJumpPage()">跳转</button>
+    </span>`;
+}
+
+function adminGoPage(n){
+  const totalPages = Math.max(1, Math.ceil(adminFilterUsers(adminAllUsers).length / ADMIN_PAGE_SIZE));
+  if(n < 1 || n > totalPages) return;
+  adminPage = n;
+  renderAdminUserRows();
+}
+
+// 跳转指定页
+function adminJumpPage(){
+  const input = document.getElementById('adminPagerJumpInput');
+  let n = parseInt(input.value, 10);
+  if(isNaN(n)){ alert('请输入正确的页码喵'); return; }
+  adminGoPage(n);
+}
+
+// 检索输入变化（防抖）：本地过滤 + 回到第 1 页
+let adminSearchTimer = null;
+function adminSearchChanged(val){
+  adminSearchText = val;
+  clearTimeout(adminSearchTimer);
+  adminSearchTimer = setTimeout(() => {
+    adminPage = 1;
+    renderAdminUserRows();
+  }, 200);
+}
+
+// 清除检索
+function adminSearchClear(){
+  const input = document.getElementById('adminSearchInput');
+  if(input) input.value = '';
+  adminSearchText = '';
+  adminPage = 1;
+  renderAdminUserRows();
 }
 // ========== 已删除 uid 冻结/回调列表 ==========
 async function renderDeletedUids(){
