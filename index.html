@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>91塔菲站 · 塔菲的小窝</title>
-<meta name="description" content="91taffy.com 塔菲的小窝喵">
+<title>91塔菲站 · coming soon</title>
+<meta name="description" content="91taffy.com 塔菲的小窝，正在施工中喵">
 <style>
 :root{
   --bg:#ffe3f0; --card:#ffffff; --ink-900:#3a1125; --ink-600:#8e2d4f;
@@ -40,6 +40,13 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
   text-shadow:0 1px 0 rgba(255,255,255,.6)}
 .tagline{margin-top:12px;font-size:14px;color:var(--pink-500)}
 .sub{margin-top:8px;font-size:13px;color:var(--ink-400)}
+.coming{margin-top:12px;font-size:20px;font-weight:600;color:#b23a63;letter-spacing:1px}
+.coming .dot{display:inline-block;animation:blink 1.4s infinite}
+.coming .dot:nth-child(2){animation-delay:.2s}
+.coming .dot:nth-child(3){animation-delay:.4s}
+@keyframes blink{0%,100%{opacity:.15}50%{opacity:1}}
+.divider{width:56px;height:3px;border-radius:3px;margin:22px auto;background:linear-gradient(90deg,#f2a4c3,#d4537e)}
+.sub b{color:#d4537e}
 
 /* 用户区 */
 .user-bar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px;
@@ -347,8 +354,11 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
     <div class="hero">
       <div class="paw"><img src="assets/badge.gif" alt="塔菲徽章"></div>
       <h1>91塔菲站</h1>
-      <div class="tagline">关注永雏塔菲喵！关注永雏塔菲谢谢喵！</div>
-      <p class="sub">塔菲从1885年的威尔士开着时光机来啦<br>在这里留下你的爪印吧喵</p>
+      <div class="coming">coming soon<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span></div>
+      <div class="divider"></div>
+      <p class="sub">塔菲正在从1885年的威尔士<br>开着时光机赶过来装修这个小窝喵<br>大家耐心等一等<b>，马上就好喵</b></p>
+      <div class="divider"></div>
+      <p class="tagline">关注永雏塔菲喵！关注永雏塔菲谢谢喵！</p>
     </div>
   </div>
 
@@ -1108,11 +1118,38 @@ async function loadSession(){
   }
   if(user){
     currentUser = user;
+    let prof = null;
     try{
-      const { data } = await supabaseClient.from('profiles').select('*').eq('id', user.id).single();
-      currentProfile = data;
+      const { data } = await supabaseClient.from('profiles').select('*').eq('id', user.id).maybeSingle();
+      prof = data;
+      // 已登录但无 profiles（验证后才建号/触发器偶发未触发）：RPC 兜底补建再读一次
+      if(!prof){
+        try{
+          const meta = user.user_metadata || {};
+          await supabaseClient.rpc('ensure_profile', {
+            p_id: user.id,
+            p_email: user.email || '',
+            p_username: meta.username || null,
+            p_nickname: meta.nickname || null
+          });
+          const { data: prof2 } = await supabaseClient.from('profiles').select('*').eq('id', user.id).maybeSingle();
+          prof = prof2;
+        }catch(e){ /* 补建失败不阻断 */ }
+      }
+      currentProfile = prof;
     }catch(e){
       console.error('读取用户资料失败', e);
+    }
+    // 资料仍读不到：当作未登录处理，避免后续 renderUserBar 崩溃
+    if(!currentProfile){
+      try{ await supabaseClient.auth.signOut(); }catch(e){}
+      currentUser = null;
+      document.getElementById('userInfo').textContent = '未登录';
+      document.getElementById('userActions').innerHTML =
+        `<button class="btn btn-ghost btn-small" onclick="showLogin()">登录</button>
+         <button class="btn btn-small" onclick="showRegister()">注册</button>`;
+      setCommentLocked(true);
+      return;
     }
     // 被封禁用户（即使已持有会话）也强制登出
     if(currentProfile && currentProfile.status === 'banned'){
@@ -1255,10 +1292,10 @@ async function doRegister(){
   const err = document.getElementById('regError');
   const btn = document.getElementById('regBtn');
   err.classList.remove('ok');
-  if(!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ err.textContent='请输入正确的邮箱'; return; }
+  if(!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ err.textContent='请输入正确的邮箱喵'; return; }
   if(isTemporaryEmail(email)){ err.textContent='该邮箱为临时邮箱，暂不支持注册喵'; return; }
-  if(!nick){ err.textContent='请输入昵称'; return; }
-  if(pass.length < 6){ err.textContent='密码至少6位'; return; }
+  if(!nick){ err.textContent='请输入昵称喵'; return; }
+  if(pass.length < 6){ err.textContent='密码至少6位喵'; return; }
   if(!supabaseClient){ err.textContent='服务暂不可用，请稍后重试喵'; return; }
   err.textContent = '';
   setAuthLoading(btn, true, '注册中…');
@@ -1294,15 +1331,15 @@ async function doLogin(){
   const btn = document.getElementById('loginBtn');
   err.classList.remove('ok');
   const pass = document.getElementById('loginPass').value;
-  if(!pass){ err.textContent='请输入密码'; return; }
+  if(!pass){ err.textContent='请输入密码喵'; return; }
   if(loginMode === 'email'){
     const email = document.getElementById('loginEmail').value.trim();
-    if(!email){ err.textContent='请输入邮箱'; return; }
+    if(!email){ err.textContent='请输入邮箱喵'; return; }
     await tryLogin({ email, password: pass }, btn, err);
   } else {
     // 账号登录：先按 username 查 profiles，拿 email 再走密码验证
     const account = document.getElementById('loginAccount').value.trim();
-    if(!account){ err.textContent='请输入账号（昵称）'; return; }
+    if(!account){ err.textContent='请输入账号（昵称）喵'; return; }
     if(!supabaseClient){ err.textContent='服务暂不可用，请稍后重试喵'; return; }
     err.textContent = '';
     setAuthLoading(btn, true, '登录中…');
@@ -1674,9 +1711,8 @@ async function loadComments(reset){
     .eq('page_id', PAGE_ID)
     .not('parent_id', 'is', null)
     .order('created_at', { ascending:true });
-  if(e2){ replies = []; }
   allComments = firsts || [];
-  allReplies = replies || [];
+  allReplies = replies || [];  // e2 出错时 replies 为 undefined，用空数组兜底
   // 3. 当前用户点赞集合
   likedSet = new Set();
   if(currentUser){
@@ -1764,7 +1800,7 @@ function renderComment(c, floor, replies){
                author.role === 'admin' ? '<span class="role-badge role-admin">管理员</span>' : '';
   const time = fmtTime(c.created_at);
   const img = c.image_url ? `<div><img class="comment-img" src="${c.image_url}" alt="评论照片" onclick="window.open('${c.image_url}')"></div>` : '';
-  const canDel = currentUser && (
+  const canDel = currentUser && currentProfile && (
     currentProfile.role === 'owner' ||
     currentProfile.role === 'admin' ||
     currentUser.id === c.author_id
@@ -1822,7 +1858,7 @@ function renderReply(r, root){
   const time = fmtTime(r.created_at);
   const img = r.image_url ? `<div><img class="comment-img" src="${r.image_url}" alt="评论照片" onclick="window.open('${r.image_url}')"></div>` : '';
   const replyPrefix = r.reply_to ? `<span class="reply-to">回复 <b>${escapeHtml(r.reply_to)}</b>：</span>` : '';
-  const canDel = currentUser && (
+  const canDel = currentUser && currentProfile && (
     currentProfile.role === 'owner' ||
     currentProfile.role === 'admin' ||
     currentUser.id === r.author_id ||
@@ -1965,7 +2001,7 @@ async function loadProfile(userId){
   }
   // 评论表单锁定
   setProfileCommentLocked(!currentUser);
-  if(currentUser){
+  if(currentUser && currentProfile){
     document.getElementById('profileCommentInput').placeholder = `以 ${escapeHtml(currentProfile.nickname||currentProfile.username)} 的身份评论喵...`;
   }
   await loadProfileComments(true);
