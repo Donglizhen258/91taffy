@@ -209,6 +209,76 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
   font-size:13px;text-align:center;color:var(--ink-900);background:#fff;outline:none}
 .pager-input:focus{border-color:var(--pink-500);box-shadow:0 0 0 2px rgba(212,83,126,.2)}
 
+/* ===== 塔菲论坛 ===== */
+/* 首页公告横幅 */
+.notice-banner{display:flex;align-items:center;gap:12px;padding:12px 16px;
+  background:linear-gradient(180deg,#fdf2f6,#fbe3ec);border:1px solid rgba(212,83,126,.35);
+  border-radius:8px}
+.notice-ico{font-size:22px;flex-shrink:0}
+.notice-body{flex:1;min-width:0}
+.notice-text{font-size:14px;color:var(--ink-800);line-height:1.5}
+.notice-meta{font-size:12px;color:var(--ink-400);margin-top:3px}
+.notice-go{font-size:13px;color:var(--pink-500);cursor:pointer;white-space:nowrap;flex-shrink:0}
+.notice-go:hover{text-decoration:underline}
+/* 论坛头部 */
+.forum-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.forum-head h2{font-size:19px;color:var(--ink-700)}
+.forum-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+/* 帖子列表项 */
+.forum-item{display:flex;align-items:center;gap:12px;padding:13px 4px;border-bottom:1px solid var(--line)}
+.forum-item:hover{background:rgba(255,234,242,.4)}
+.f-item-main{flex:1;min-width:0}
+.f-item-title{font-size:15px;color:var(--ink-800);cursor:pointer;line-height:1.4;word-break:break-word}
+.f-item-title:hover{color:var(--pink-500)}
+.f-item-meta{font-size:12px;color:var(--ink-400);margin-top:5px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.f-item-stats{display:flex;align-items:center;gap:10px;flex-shrink:0;font-size:13px;color:var(--ink-500)}
+.f-stat-reply{color:var(--pink-500);font-weight:600}
+.f-pin-badge{font-size:11px;padding:1px 7px;border-radius:3px;color:#fff;flex-shrink:0}
+.f-pin-notice{background:linear-gradient(180deg,#e8869f,#c74870)}
+.f-pin-top{background:linear-gradient(180deg,#f0a04b,#d07a1f)}
+.f-essence-badge{font-size:11px;padding:1px 7px;border-radius:3px;flex-shrink:0;
+  background:linear-gradient(180deg,#ffe9a8,#f6c453);color:#7a5a00;font-weight:600}
+.f-author{display:flex;align-items:center;gap:6px;min-width:0}
+.f-author img{width:22px;height:22px;border-radius:4px;flex-shrink:0}
+/* 帖子详情 */
+.forum-post-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.forum-post-title{font-size:20px;color:var(--ink-800);line-height:1.4;margin:2px 0 8px;word-break:break-word}
+.forum-post-meta{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--ink-400);flex-wrap:wrap;margin-bottom:14px}
+.fp-floor-head{font-size:12px;color:var(--pink-500);font-weight:600;margin:12px 0 4px}
+.fp-main-content{font-size:14px;color:var(--ink-800);line-height:1.7;white-space:pre-wrap;word-break:break-word;margin-bottom:10px}
+.fp-main-img{max-width:100%;max-height:400px;border-radius:6px;cursor:zoom-in;margin:8px 0}
+/* 楼主楼层（1楼） */
+.fp-lz{background:rgba(255,234,242,.35);border:1px dashed rgba(212,83,126,.35);border-radius:8px;padding:14px}
+/* 回帖楼层 */
+.fp-reply{display:flex;gap:12px;padding:14px 4px;border-bottom:1px solid var(--line)}
+.fp-reply-avatar{width:40px;height:40px;border-radius:6px;overflow:hidden;flex-shrink:0;cursor:pointer}
+.fp-reply-avatar img{width:100%;height:100%;object-fit:cover}
+.fp-reply-body{flex:1;min-width:0}
+.fp-reply-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+.fp-reply-content{font-size:14px;color:var(--ink-800);line-height:1.7;white-space:pre-wrap;word-break:break-word}
+.fp-reply-img{max-width:100%;max-height:300px;border-radius:6px;cursor:zoom-in;margin-top:8px}
+.fp-reply-foot{display:flex;align-items:center;gap:12px;margin-top:8px;font-size:12px;color:var(--ink-400)}
+.fp-reply-actions{margin-left:auto;display:flex;gap:8px}
+/* 楼中楼 */
+.fp-lzl{margin-top:10px;padding-left:12px;border-left:2px solid rgba(212,83,126,.25)}
+.fp-lzl-item{display:flex;gap:10px;padding:8px 0;border-bottom:1px dashed rgba(212,83,126,.18)}
+.fp-lzl-item:last-child{border-bottom:none}
+.fp-lzl-avatar{width:30px;height:30px;border-radius:4px;overflow:hidden;flex-shrink:0;cursor:pointer}
+.fp-lzl-avatar img{width:100%;height:100%;object-fit:cover}
+/* 论坛回帖输入区 */
+.forum-reply-box{margin-top:14px;padding:14px;background:rgba(255,234,242,.3);border:1px solid rgba(212,83,126,.3);border-radius:8px}
+.forum-reply-lock{text-align:center;padding:18px;color:var(--ink-500);font-size:13px}
+/* 发帖弹窗 */
+.post-modal-title{margin-bottom:10px}
+.post-field{margin-bottom:12px}
+.post-field label{display:block;font-size:13px;color:var(--ink-600);margin-bottom:6px}
+.post-field input[type=text],.post-field textarea{width:100%;padding:9px 11px;border:1px solid rgba(178,58,99,.4);
+  border-radius:4px;font-size:14px;font-family:inherit;color:var(--ink-900);background:#fff;outline:none;box-sizing:border-box}
+.post-field input[type=text]:focus,.post-field textarea:focus{border-color:var(--pink-500);box-shadow:0 0 0 2px rgba(212,83,126,.2)}
+.post-field textarea{min-height:110px;resize:vertical;line-height:1.6}
+.post-author-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:6px}
+.post-author-row input[type=checkbox]{width:auto}
+
 /* 用户资料详情页 */
 .profile-head{display:flex;gap:16px;align-items:flex-start;margin-bottom:18px;flex-wrap:wrap}
 .profile-head-top{flex-basis:100%;display:flex;justify-content:flex-end;margin-bottom:4px}
@@ -331,6 +401,9 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
   <div class="nav-item active" id="navHome" onclick="switchView('home')">
     <span class="nav-ico">🏠</span>首页
   </div>
+  <div class="nav-item" id="navForum" onclick="switchView('forum')">
+    <span class="nav-ico">💬</span>塔菲论坛
+  </div>
   <div class="nav-item" id="navAccount" onclick="switchView('account')">
     <span class="nav-ico">👤</span>账号管理
   </div>
@@ -359,6 +432,18 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
       <p class="sub">塔菲正在从1885年的威尔士<br>开着时光机赶过来装修这个小窝喵<br>大家耐心等一等<b>，马上就好喵</b></p>
       <div class="divider"></div>
       <p class="tagline">关注永雏塔菲喵！关注永雏塔菲谢谢喵！</p>
+    </div>
+  </div>
+
+  <!-- 首页公告横幅（论坛公告贴自动同步显示，仅站长/管理员可发） -->
+  <div class="card" id="homeNoticeCard" style="display:none">
+    <div class="notice-banner" id="homeNoticeContent">
+      <span class="notice-ico">📢</span>
+      <div class="notice-body">
+        <div class="notice-text" id="homeNoticeText"></div>
+        <div class="notice-meta" id="homeNoticeMeta"></div>
+      </div>
+      <a class="notice-go" onclick="openForumPostFromNotice()">去查看 →</a>
     </div>
   </div>
 
@@ -597,8 +682,87 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
       <div id="profileCommentPager" class="pager" style="display:none"></div>
     </div>
   </div>
+
+  <!-- ===== 塔菲论坛：帖子列表视图 ===== -->
+  <div class="view" id="viewForum">
+    <div class="card">
+      <div class="forum-head">
+        <h2>💬 塔菲论坛</h2>
+        <span class="sub" id="forumCount"></span>
+        <div style="margin-left:auto;display:flex;gap:8px">
+          <button class="btn btn-ghost btn-small" onclick="showPostModal()">发帖</button>
+        </div>
+      </div>
+      <div class="forum-tabs">
+        <button class="sort-btn active" data-fs="all" onclick="setForumFilter('all')">全部</button>
+        <button class="sort-btn" data-fs="essence" onclick="setForumFilter('essence')">精华</button>
+        <button class="sort-btn" data-fs="notice" onclick="setForumFilter('notice')">公告</button>
+      </div>
+      <div id="forumList"><div class="loading">加载中喵...</div></div>
+      <div id="forumPager" class="pager" style="display:none"></div>
+    </div>
+  </div>
+
+  <!-- ===== 塔菲论坛：帖子详情视图 ===== -->
+  <div class="view" id="viewForumPost">
+    <div class="card">
+      <div class="forum-post-top">
+        <button class="btn btn-ghost btn-small" onclick="switchView('forum')">← 返回列表</button>
+        <div style="margin-left:auto;display:flex;gap:8px">
+          <button class="btn btn-ghost btn-small" id="forumPinBtn" style="display:none" onclick="toggleForumPin()">📌 置顶</button>
+          <button class="btn btn-ghost btn-small" id="forumEssenceBtn" style="display:none" onclick="toggleForumEssence()">⭐ 加精</button>
+          <button class="btn btn-bad btn-small" id="forumDelPostBtn" style="display:none" onclick="deleteForumPost()">删帖</button>
+        </div>
+      </div>
+      <div id="forumPostBody"><div class="loading">加载中喵...</div></div>
+    </div>
+  </div>
 </div>
 
+
+<!-- 发帖弹窗 -->
+<div class="modal-mask" id="postModal">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-head">
+      <b>发帖</b>
+      <span class="modal-close" onclick="closeModal('postModal')">×</span>
+    </div>
+    <div class="auth-error" id="postError"></div>
+    <div class="post-field">
+      <label>标题</label>
+      <input type="text" id="postTitle" maxlength="40" placeholder="起个吸引人的标题喵...">
+    </div>
+    <div class="post-field">
+      <label>正文</label>
+      <textarea id="postContent" maxlength="2000" placeholder="写下你想说的话喵..."></textarea>
+    </div>
+    <div class="post-field">
+      <label>配图（可选）</label>
+      <button class="btn btn-ghost btn-small" onclick="document.getElementById('postImgInput').click()">选择图片</button>
+      <input type="file" id="postImgInput" accept="image/*" style="display:none" onchange="handlePostImg(event)">
+      <span id="postImgStatus" class="sub" style="margin-left:8px"></span>
+      <div id="postImgPreview" style="display:none;margin-top:8px;position:relative">
+        <img id="postImgPreviewImg" alt="预览" style="max-width:200px;max-height:150px;border-radius:6px">
+        <button class="x" style="position:absolute;top:-8px;right:-8px" onclick="removePostImg()">×</button>
+      </div>
+    </div>
+    <div class="post-field" id="postTypeRow" style="display:none">
+      <label>帖子类型</label>
+      <select id="postType" onchange="onPostTypeChange()">
+        <option value="post">普通帖</option>
+        <option value="notice">📢 公告贴（首页顶端显示，仅站长/管理员）</option>
+      </select>
+    </div>
+    <div class="post-field" id="postAsRow" style="display:none">
+      <div class="post-author-row">
+        <label style="margin:0;display:flex;align-items:center;gap:6px;cursor:pointer">
+          <input type="checkbox" id="postAsAssistant"> 以「站内管家」(UID 1) 身份发布
+        </label>
+      </div>
+    </div>
+    <button class="btn" id="postSubmitBtn" style="width:100%" onclick="submitPost()">发布</button>
+  </div>
+</div>
 
 <!-- 登录弹窗 -->
 <div class="modal-mask" id="loginModal">
@@ -732,30 +896,48 @@ function switchView(name){
   const acc = document.getElementById('viewAccount');
   const admin = document.getElementById('viewAdmin');
   const profile = document.getElementById('viewProfile');
+  const forum = document.getElementById('viewForum');
+  const forumPost = document.getElementById('viewForumPost');
   const navHome = document.getElementById('navHome');
   const navAcc = document.getElementById('navAccount');
   const navAdmin = document.getElementById('navAdmin');
+  const navForum = document.getElementById('navForum');
   // 先全部隐藏
   home.classList.remove('show');
   acc.classList.remove('show');
   if(admin) admin.classList.remove('show');
   if(profile) profile.classList.remove('show');
+  if(forum) forum.classList.remove('show');
+  if(forumPost) forumPost.classList.remove('show');
   navHome.classList.remove('active');
   navAcc.classList.remove('active');
   if(navAdmin) navAdmin.classList.remove('active');
+  if(navForum) navForum.classList.remove('active');
   if(name === 'home'){
     PAGE_ID = 'home';
     ACTIVE = 'home';
     home.classList.add('show');
     navHome.classList.add('active');
-    // 回到首页刷新评论
+    // 回到首页刷新评论 + 公告横幅
     if(typeof loadComments === 'function') loadComments(true);
+    if(typeof loadAnnouncement === 'function') loadAnnouncement();
   } else if(name === 'account'){
     PAGE_ID = 'home';
     ACTIVE = 'home';
     acc.classList.add('show');
     navAcc.classList.add('active');
     loadAccountView();
+  } else if(name === 'forum'){
+    PAGE_ID = 'home';
+    ACTIVE = 'home';
+    forum.classList.add('show');
+    navForum.classList.add('active');
+    if(typeof loadForum === 'function') loadForum(true);
+  } else if(name === 'forumPost'){
+    PAGE_ID = 'home';
+    ACTIVE = 'home';
+    forumPost.classList.add('show');
+    if(typeof renderForumPost === 'function') renderForumPost();
   } else if(name === 'admin'){
     // 仅站长/管理员可进入该视图
     if(currentProfile && ['owner','admin'].includes(currentProfile.role)){
@@ -1070,6 +1252,8 @@ async function init(){
     console.error('会话加载失败', e);
   }
   await loadComments(true);
+  if(typeof loadAnnouncement === 'function') loadAnnouncement();
+  if(typeof loadForum === 'function') loadForum(true);
 }
 init();
 
@@ -2449,6 +2633,527 @@ function escapeHtml(s){
     {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]
   ));
 }
+
+// ============================================================
+// =================== 塔菲论坛 =================================
+// ============================================================
+const FORUM_PAGE_SIZE = 20;        // 论坛列表每页帖子数
+let forumPage = 1;                 // 当前论坛页码
+let forumTotalPages = 1;
+let forumFilter = 'all';           // all / essence / notice
+let allForumPosts = [];            // 论坛帖子全量（含作者）
+let currentForumPost = null;       // 正在查看的帖子
+let currentForumReplies = [];      // 当前帖子的回帖（主回帖）
+let currentForumLZL = [];          // 当前帖子的楼中楼
+let forumLikedSet = new Set();     // 当前用户赞过的回帖 id
+let forumReplyTo = null;           // { id, name } 正在楼中楼回复的楼层
+let forumPostImgFile = null;       // 发帖配图文件
+
+// ===== 公告横幅（首页顶端） =====
+async function loadAnnouncement(){
+  const card = document.getElementById('homeNoticeCard');
+  if(!card) return;
+  try{
+    const { data, error } = await supabaseClient
+      .from('forum_posts')
+      .select('id,title,content,author_id,created_at,author:profiles!forum_posts_author_id_fkey(nickname,username)')
+      .eq('post_type', 'notice')
+      .order('created_at', { ascending:false })
+      .limit(1);
+    if(error || !data || !data.length){
+      card.style.display = 'none';
+      return;
+    }
+    const n = data[0];
+    const author = n.author || {};
+    const name = author.nickname || author.username || '神秘用户';
+    document.getElementById('homeNoticeText').innerHTML = '📢 ' + escapeHtml(n.title);
+    document.getElementById('homeNoticeMeta').textContent = `${name} · ${fmtTime(n.created_at)}`;
+    card.dataset.postId = n.id;
+    card.style.display = '';
+  }catch(e){
+    card.style.display = 'none';
+  }
+}
+function openForumPostFromNotice(){
+  const card = document.getElementById('homeNoticeCard');
+  if(card && card.dataset.postId){
+    openForumPost(card.dataset.postId);
+  }
+}
+
+// ===== 论坛帖子列表 =====
+async function loadForum(reset){
+  if(reset){ forumPage = 1; }
+  const list = document.getElementById('forumList');
+  if(!list || !supabaseClient){
+    if(list) list.innerHTML = `<div class="empty">论坛服务暂不可用，请稍后刷新喵</div>`;
+    return;
+  }
+  list.innerHTML = `<div class="loading">加载中喵...</div>`;
+  const { data, error } = await supabaseClient
+    .from('forum_posts')
+    .select('id,title,content,image_url,author_id,post_type,is_pinned,is_essence,reply_count,last_reply_at,created_at,author:profiles!forum_posts_author_id_fkey(id,nickname,username,uid,role,avatar_url)')
+    .order('created_at', { ascending:false });
+  if(error){
+    list.innerHTML = `<div class="empty">加载失败：${zhErr(error.message)}</div>`;
+    return;
+  }
+  allForumPosts = data || [];
+  document.getElementById('forumCount').textContent = allForumPosts.length ? `共 ${allForumPosts.length} 帖` : '';
+  renderForumList();
+}
+function setForumFilter(f){
+  forumFilter = f;
+  forumPage = 1;
+  document.querySelectorAll('#viewForum .sort-btn').forEach(b => b.classList.toggle('active', b.dataset.fs === f));
+  renderForumList();
+}
+function renderForumList(){
+  const list = document.getElementById('forumList');
+  let items = [...allForumPosts];
+  if(forumFilter === 'essence') items = items.filter(p => p.is_essence);
+  else if(forumFilter === 'notice') items = items.filter(p => p.post_type === 'notice');
+  if(!items.length){
+    list.innerHTML = `<div class="empty">还没有帖子，快来发第一帖喵~</div>`;
+    document.getElementById('forumPager').style.display = 'none';
+    return;
+  }
+  // 排序：置顶最前（公告>置顶），再按最后回复时间（无人回按发帖时间）
+  items.sort((a,b) => {
+    const pa = a.post_type === 'notice' ? 2 : (a.is_pinned ? 1 : 0);
+    const pb = b.post_type === 'notice' ? 2 : (b.is_pinned ? 1 : 0);
+    if(pa !== pb) return pb - pa;
+    const ta = a.last_reply_at || a.created_at;
+    const tb = b.last_reply_at || b.created_at;
+    return new Date(tb) - new Date(ta);
+  });
+  // 分页
+  forumTotalPages = Math.max(1, Math.ceil(items.length / FORUM_PAGE_SIZE));
+  if(forumPage > forumTotalPages) forumPage = forumTotalPages;
+  const start = (forumPage - 1) * FORUM_PAGE_SIZE;
+  const pageItems = items.slice(start, start + FORUM_PAGE_SIZE);
+  list.innerHTML = pageItems.map(p => renderForumItem(p)).join('');
+  const pager = document.getElementById('forumPager');
+  if(forumTotalPages <= 1){ pager.style.display = 'none'; }
+  else {
+    pager.style.display = 'flex';
+    pager.innerHTML = `
+      <button class="pager-btn" ${forumPage <= 1 ? 'disabled' : ''} onclick="forumGoPage(${forumPage-1})">上一页</button>
+      <span class="pager-info">第 ${forumPage} / ${forumTotalPages} 页</span>
+      <button class="pager-btn" ${forumPage >= forumTotalPages ? 'disabled' : ''} onclick="forumGoPage(${forumPage+1})">下一页</button>`;
+  }
+}
+function forumGoPage(n){
+  if(n < 1 || n > forumTotalPages) return;
+  forumPage = n;
+  renderForumList();
+}
+function renderForumItem(p){
+  const author = p.author || {};
+  const name = escapeHtml(author.nickname || author.username || '神秘用户');
+  const isNotice = p.post_type === 'notice';
+  const isPinned = p.is_pinned;
+  const badge = isNotice
+    ? '<span class="f-pin-badge f-pin-notice">📢 公告</span>'
+    : (isPinned ? '<span class="f-pin-badge f-pin-top">📌 置顶</span>' : '');
+  const essence = p.is_essence ? '<span class="f-essence-badge">⭐ 精</span>' : '';
+  const lastTime = p.last_reply_at ? fmtTime(p.last_reply_at) : '';
+  const lastText = p.last_reply_at
+    ? `最后回复 ${lastTime}`
+    : (p.reply_count ? '' : fmtTime(p.created_at));
+  return `
+  <div class="forum-item">
+    <div class="f-item-main">
+      <div class="f-item-title" onclick="openForumPost('${p.id}')">${badge}${essence} ${escapeHtml(p.title)}</div>
+      <div class="f-item-meta">
+        <span class="f-author"><img src="${escapeHtml(author.avatar_url || DEFAULT_AVATAR)}" alt="" loading="lazy" onerror="this.onerror=null;this.src='${DEFAULT_AVATAR}'">${name}</span>
+        <span>UID ${author.uid != null ? author.uid : '?'}</span>
+        <span>${fmtTime(p.created_at)}</span>
+        ${lastText ? `<span>${lastText}</span>` : ''}
+      </div>
+    </div>
+    <div class="f-item-stats">
+      <span class="f-stat-reply">💬 ${p.reply_count || 0}</span>
+    </div>
+  </div>`;
+}
+
+// ===== 帖子详情 =====
+async function openForumPost(id){
+  if(!id){ alert('帖子不存在喵'); return; }
+  const { data, error } = await supabaseClient
+    .from('forum_posts')
+    .select('id,title,content,image_url,author_id,post_type,is_pinned,is_essence,reply_count,last_reply_at,created_at,author:profiles!forum_posts_author_id_fkey(id,nickname,username,uid,role,avatar_url)')
+    .eq('id', id)
+    .maybeSingle();
+  if(error || !data){
+    alert('帖子不存在或已删除喵');
+    return;
+  }
+  currentForumPost = data;
+  // 加载回帖
+  const [r1, r2] = await Promise.all([
+    supabaseClient.from('forum_replies')
+      .select('id,post_id,parent_id,author_id,content,image_url,floor,reply_to,like_count,created_at,author:profiles!forum_replies_author_id_fkey(id,nickname,username,uid,role,avatar_url)')
+      .eq('post_id', id).is('parent_id', null).order('floor', { ascending:true }),
+    supabaseClient.from('forum_replies')
+      .select('id,post_id,parent_id,author_id,content,image_url,floor,reply_to,like_count,created_at,author:profiles!forum_replies_author_id_fkey(id,nickname,username,uid,role,avatar_url)')
+      .eq('post_id', id).not('parent_id', 'is', null).order('created_at', { ascending:true })
+  ]);
+  currentForumReplies = (r1.data || []).map(r => ({ ...r, author: r.author || {} }));
+  currentForumLZL = (r2.data || []).map(r => ({ ...r, author: r.author || {} }));
+  // 点赞集合
+  forumLikedSet = new Set();
+  if(currentUser){
+    const { data: likes } = await supabaseClient.from('forum_likes')
+      .select('reply_id').eq('user_id', currentUser.id);
+    forumLikedSet = new Set((likes || []).map(l => l.reply_id));
+  }
+  switchView('forumPost');
+}
+function renderForumPost(){
+  const p = currentForumPost;
+  const body = document.getElementById('forumPostBody');
+  if(!p){
+    body.innerHTML = `<div class="empty">请先选择一个帖子喵</div>`;
+    return;
+  }
+  const author = p.author || {};
+  const name = escapeHtml(author.nickname || author.username || '神秘用户');
+  const isOwner = currentProfile && ['owner','admin'].includes(currentProfile.role);
+  const canDel = currentUser && (currentUser.id === p.author_id || isOwner);
+  document.getElementById('forumPinBtn').style.display = isOwner && p.post_type !== 'notice' ? '' : 'none';
+  document.getElementById('forumEssenceBtn').style.display = isOwner ? '' : 'none';
+  document.getElementById('forumDelPostBtn').style.display = canDel ? '' : 'none';
+  const pinText = p.is_pinned ? '取消置顶' : '📌 置顶';
+  document.getElementById('forumPinBtn').textContent = pinText;
+  const essenceText = p.is_essence ? '取消加精' : '⭐ 加精';
+  document.getElementById('forumEssenceBtn').textContent = essenceText;
+  const typeBadge = p.post_type === 'notice' ? '<span class="f-pin-badge f-pin-notice" style="margin-right:6px">📢 公告</span>' : '';
+  const pinBadge = p.is_pinned ? '<span class="f-pin-badge f-pin-top" style="margin-right:6px">📌 置顶</span>' : '';
+  const essenceBadge = p.is_essence ? '<span class="f-essence-badge">⭐ 精华</span>' : '';
+  const role = author.role === 'owner' ? '<span class="role-badge role-owner">站长</span>' :
+               author.role === 'admin' ? '<span class="role-badge role-admin">管理员</span>' : '';
+  const mainImg = p.image_url
+    ? `<div><img class="fp-main-img" src="${escapeHtml(p.image_url)}" alt="帖子配图" onclick="window.open('${escapeHtml(p.image_url)}')"></div>` : '';
+  // 楼主楼层（1楼）
+  const lzHtml = `
+    <div class="fp-lz">
+      <div class="fp-reply-meta">
+        <img src="${escapeHtml(author.avatar_url || DEFAULT_AVATAR)}" alt="" style="width:32px;height:32px;border-radius:6px" ondblclick="openProfile('${p.author_id}')" title="双击查看TA的主页">
+        <span style="font-weight:600;color:var(--ink-800)">${name}</span>${role}
+        <span class="comment-uid">UID ${author.uid != null ? author.uid : '?'}</span>
+      </div>
+      <div class="fp-floor-head">楼主 · 1楼</div>
+      <div class="fp-main-content">${escapeHtml(p.content) || '<i style="color:#999">[暂无内容]</i>'}</div>
+      ${mainImg}
+      <div class="fp-reply-foot"><span class="comment-time">${fmtTime(p.created_at)}</span></div>
+    </div>`;
+  // 回帖楼层
+  const repliesHtml = currentForumReplies.length
+    ? currentForumReplies.map(r => renderForumReply(r, p)).join('')
+    : `<div class="empty" style="padding:16px 0">还没有回帖，抢个沙发喵~</div>`;
+  const replyBox = currentUser
+    ? `
+    <div class="forum-reply-box">
+      <div class="forum-reply-lock" id="forumReplyToBar" style="display:none;padding:0 0 8px;text-align:left">
+        <span style="color:var(--ink-600)">回复 <b id="forumReplyToName"></b>：</span>
+        <button class="x" onclick="cancelForumReply()">×</button>
+      </div>
+      <textarea id="forumReplyInput" placeholder="写下你的回帖喵..." maxlength="1000" style="width:100%;min-height:80px;border:1px solid rgba(178,58,99,.4);border-radius:4px;padding:10px;font-size:14px;font-family:inherit;color:var(--ink-900);background:#fff;resize:vertical;outline:none;box-sizing:border-box"></textarea>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap">
+        <button class="btn btn-ghost btn-small" onclick="document.getElementById('forumReplyImgInput').click()">照片</button>
+        <input type="file" id="forumReplyImgInput" accept="image/*" style="display:none" onchange="handleForumReplyImg(event)">
+        <span id="forumReplyImgStatus" class="sub"></span>
+        <button class="btn btn-small" id="forumReplySubmitBtn" style="margin-left:auto" onclick="submitForumReply()">发表回帖</button>
+      </div>
+    </div>`
+    : `
+    <div class="forum-reply-lock">
+      <span class="lock-icon">🔒</span>
+      <div class="lock-text">登录后才能回帖喵</div>
+      <div class="auth-btns" style="margin-top:8px">
+        <button class="btn btn-ghost" onclick="showLogin()">登录</button>
+        <button class="btn" onclick="showRegister()">注册</button>
+      </div>
+    </div>`;
+  body.innerHTML = `
+    <div class="forum-post-title">${typeBadge}${pinBadge}${essenceBadge} ${escapeHtml(p.title)}</div>
+    <div class="forum-post-meta"><span>共 ${currentForumReplies.length} 条回帖</span></div>
+    ${lzHtml}
+    <div class="fp-floor-head">回帖楼层</div>
+    ${repliesHtml}
+    ${replyBox}`;
+}
+function renderForumReply(r, post){
+  const author = r.author || {};
+  const name = escapeHtml(author.nickname || author.username || '神秘用户');
+  const role = author.role === 'owner' ? '<span class="role-badge role-owner">站长</span>' :
+               author.role === 'admin' ? '<span class="role-badge role-admin">管理员</span>' : '';
+  const uid = author.uid != null ? `<span class="comment-uid">UID ${author.uid}</span>` : '';
+  const img = r.image_url ? `<div><img class="fp-reply-img" src="${escapeHtml(r.image_url)}" alt="回帖图片" onclick="window.open('${escapeHtml(r.image_url)}')"></div>` : '';
+  const liked = forumLikedSet.has(r.id);
+  const likeBtn = `<button class="btn btn-ghost btn-small like-btn${liked ? ' liked' : ''}" onclick="toggleForumLike('${r.id}')">${liked ? '❤️' : '🤍'} ${r.like_count || 0}</button>`;
+  const replyBtn = `<button class="btn btn-ghost btn-small" onclick="startForumReply('${r.id}','${escapeHtml(name)}')">回复</button>`;
+  const canDel = currentUser && currentProfile && (
+    currentProfile.role === 'owner' ||
+    currentProfile.role === 'admin' ||
+    currentUser.id === r.author_id ||
+    currentUser.id === post.author_id
+  );
+  const delBtn = canDel ? `<button class="btn btn-bad btn-small" onclick="deleteForumReply('${r.id}')">删除</button>` : '';
+  // 楼中楼
+  const lzl = currentForumLZL.filter(x => x.parent_id === r.id).map(l => renderForumLZL(l, r)).join('');
+  return `
+  <div class="fp-reply" data-id="${r.id}">
+    <div class="fp-reply-avatar" ondblclick="openProfile('${r.author_id}')" title="双击查看TA的主页"><img src="${escapeHtml(author.avatar_url || DEFAULT_AVATAR)}" alt="" loading="lazy" onerror="this.onerror=null;this.src='${DEFAULT_AVATAR}'"></div>
+    <div class="fp-reply-body">
+      <div class="fp-reply-meta">
+        <span style="font-weight:600;color:var(--ink-800)">${name}</span>${role}${uid}
+        <span class="comment-floor">${r.floor}楼</span>
+      </div>
+      <div class="fp-reply-content">${escapeHtml(r.content)}</div>
+      ${img}
+      <div class="fp-reply-foot">
+        <span class="comment-time">${fmtTime(r.created_at)}</span>
+        <div class="fp-reply-actions">${likeBtn}${replyBtn}${delBtn}</div>
+      </div>
+      ${lzl ? `<div class="fp-lzl">${lzl}</div>` : ''}
+    </div>
+  </div>`;
+}
+function renderForumLZL(l, parent){
+  const author = l.author || {};
+  const name = escapeHtml(author.nickname || author.username || '神秘用户');
+  const role = author.role === 'owner' ? '<span class="role-badge role-owner">站长</span>' :
+               author.role === 'admin' ? '<span class="role-badge role-admin">管理员</span>' : '';
+  const replyPrefix = l.reply_to ? `<span class="reply-to">回复 <b>${escapeHtml(l.reply_to)}</b>：</span>` : '';
+  const liked = forumLikedSet.has(l.id);
+  const likeBtn = `<button class="btn btn-ghost btn-small like-btn${liked ? ' liked' : ''}" onclick="toggleForumLike('${l.id}')">${liked ? '❤️' : '🤍'} ${l.like_count || 0}</button>`;
+  const canDel = currentUser && currentProfile && (
+    currentProfile.role === 'owner' ||
+    currentProfile.role === 'admin' ||
+    currentUser.id === l.author_id ||
+    currentUser.id === parent.author_id
+  );
+  const delBtn = canDel ? `<button class="btn btn-bad btn-small" onclick="deleteForumReply('${l.id}')">删除</button>` : '';
+  const img = l.image_url ? `<div><img class="fp-reply-img" style="max-height:150px" src="${escapeHtml(l.image_url)}" alt="" onclick="window.open('${escapeHtml(l.image_url)}')"></div>` : '';
+  return `
+  <div class="fp-lzl-item" data-id="${l.id}">
+    <div class="fp-lzl-avatar" ondblclick="openProfile('${l.author_id}')" title="双击查看TA的主页"><img src="${escapeHtml(author.avatar_url || DEFAULT_AVATAR)}" alt="" loading="lazy" onerror="this.onerror=null;this.src='${DEFAULT_AVATAR}'"></div>
+    <div class="comment-body">
+      <div class="comment-meta">
+        <span class="comment-name">${name}</span>${role}
+      </div>
+      <div class="comment-content">${replyPrefix}${escapeHtml(l.content)}</div>
+      ${img}
+      <div class="comment-foot"><span class="comment-time">${fmtTime(l.created_at)}</span></div>
+      <div class="comment-actions">${likeBtn}${delBtn}</div>
+    </div>
+  </div>`;
+}
+
+// ===== 发帖 =====
+function showPostModal(){
+  if(!currentUser){ alert('请先登录喵'); return; }
+  const isAdmin = currentProfile && ['owner','admin'].includes(currentProfile.role);
+  document.getElementById('postTypeRow').style.display = isAdmin ? '' : 'none';
+  document.getElementById('postType').value = 'post';
+  document.getElementById('postAsRow').style.display = 'none';
+  document.getElementById('postAsAssistant').checked = false;
+  document.getElementById('postTitle').value = '';
+  document.getElementById('postContent').value = '';
+  document.getElementById('postError').textContent = '';
+  removePostImg();
+  document.getElementById('postModal').classList.add('show');
+}
+function onPostTypeChange(){
+  const t = document.getElementById('postType').value;
+  document.getElementById('postAsRow').style.display = t === 'notice' ? '' : 'none';
+}
+function handlePostImg(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  if(!file.type.startsWith('image/')){ alert('请选择图片文件喵'); return; }
+  compressImage(file).then(blob => {
+    forumPostImgFile = new File([blob], 'post.jpg', { type: 'image/jpeg' });
+    const url = URL.createObjectURL(forumPostImgFile);
+    document.getElementById('postImgPreviewImg').src = url;
+    document.getElementById('postImgPreview').style.display = 'inline-block';
+    document.getElementById('postImgStatus').textContent = `压缩后 ${(forumPostImgFile.size/1024).toFixed(0)}KB`;
+  });
+}
+function removePostImg(){
+  forumPostImgFile = null;
+  document.getElementById('postImgPreview').style.display = 'none';
+  document.getElementById('postImgPreviewImg').src = '';
+  document.getElementById('postImgStatus').textContent = '';
+  document.getElementById('postImgInput').value = '';
+}
+async function submitPost(){
+  const btn = document.getElementById('postSubmitBtn');
+  const err = document.getElementById('postError');
+  const title = document.getElementById('postTitle').value.trim();
+  const content = document.getElementById('postContent').value.trim();
+  if(!title){ err.textContent = '请填写标题喵'; return; }
+  if(!content){ err.textContent = '请填写正文喵'; return; }
+  const type = document.getElementById('postType').value;
+  const asAssistant = document.getElementById('postAsAssistant') && document.getElementById('postAsAssistant').checked;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> 发布中…';
+  err.textContent = '';
+  try{
+    // 先传图
+    let imageUrl = '';
+    if(forumPostImgFile){
+      const path = `forum/${currentUser.id}/${Date.now()}.jpg`;
+      const { error: upErr } = await supabaseClient.storage.from('comment-images').upload(path, forumPostImgFile);
+      if(upErr) throw new Error('图片上传失败：' + zhErr(upErr.message));
+      const { data: { publicUrl } } = supabaseClient.storage.from('comment-images').getPublicUrl(path);
+      imageUrl = publicUrl;
+    }
+    const { data, error } = await supabaseClient.rpc('create_forum_post', {
+      p_title: title, p_content: content, p_image_url: imageUrl,
+      p_type: type, p_as_assistant: asAssistant
+    });
+    if(error) throw new Error(zhErr(error.message));
+    closeModal('postModal');
+    alert('帖子发布成功喵！');
+    await loadForum(true);
+    await loadAnnouncement();
+    openForumPost(data);
+  }catch(e){
+    btn.disabled = false;
+    btn.innerHTML = '发布';
+    err.textContent = e.message || '发布失败，请稍后再试喵';
+  }
+}
+
+// ===== 回帖（楼层 + 楼中楼） =====
+let forumReplyImgFile = null;
+function handleForumReplyImg(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  if(!file.type.startsWith('image/')){ alert('请选择图片文件喵'); return; }
+  compressImage(file).then(blob => {
+    forumReplyImgFile = new File([blob], 'reply.jpg', { type: 'image/jpeg' });
+    document.getElementById('forumReplyImgStatus').textContent = `已选图 ${(forumReplyImgFile.size/1024).toFixed(0)}KB`;
+  });
+}
+function startForumReply(id, name){
+  if(!currentUser){ alert('请先登录喵'); return; }
+  forumReplyTo = { id, name };
+  document.getElementById('forumReplyToName').textContent = name;
+  document.getElementById('forumReplyToBar').style.display = '';
+  const ta = document.getElementById('forumReplyInput');
+  ta.focus();
+  ta.scrollIntoView({ behavior:'smooth', block:'center' });
+}
+function cancelForumReply(){
+  forumReplyTo = null;
+  document.getElementById('forumReplyToBar').style.display = 'none';
+}
+async function submitForumReply(){
+  if(!currentUser){ alert('请先登录喵'); return; }
+  const ta = document.getElementById('forumReplyInput');
+  const text = ta.value.trim();
+  if(!text && !forumReplyImgFile){ alert('说点什么再发喵'); return; }
+  const btn = document.getElementById('forumReplySubmitBtn');
+  ta.disabled = true;
+  try{
+    let imageUrl = '';
+    if(forumReplyImgFile){
+      const path = `forum/${currentUser.id}/${Date.now()}.jpg`;
+      const { error: upErr } = await supabaseClient.storage.from('comment-images').upload(path, forumReplyImgFile);
+      if(upErr) throw new Error('图片上传失败：' + zhErr(upErr.message));
+      const { data: { publicUrl } } = supabaseClient.storage.from('comment-images').getPublicUrl(path);
+      imageUrl = publicUrl;
+    }
+    const parentId = forumReplyTo ? forumReplyTo.id : null;
+    const { error } = await supabaseClient.rpc('create_forum_reply', {
+      p_post_id: currentForumPost.id, p_content: text,
+      p_parent_id: parentId, p_image_url: imageUrl
+    });
+    if(error) throw new Error(zhErr(error.message));
+    ta.value = '';
+    forumReplyImgFile = null;
+    document.getElementById('forumReplyImgStatus').textContent = '';
+    cancelForumReply();
+    await loadForumPostData(currentForumPost.id);
+    renderForumPost();
+  }catch(e){
+    ta.disabled = false;
+    alert(e.message || '回帖失败喵');
+  }
+}
+async function loadForumPostData(id){
+  const [r1, r2] = await Promise.all([
+    supabaseClient.from('forum_replies')
+      .select('id,post_id,parent_id,author_id,content,image_url,floor,reply_to,like_count,created_at,author:profiles!forum_replies_author_id_fkey(id,nickname,username,uid,role,avatar_url)')
+      .eq('post_id', id).is('parent_id', null).order('floor', { ascending:true }),
+    supabaseClient.from('forum_replies')
+      .select('id,post_id,parent_id,author_id,content,image_url,floor,reply_to,like_count,created_at,author:profiles!forum_replies_author_id_fkey(id,nickname,username,uid,role,avatar_url)')
+      .eq('post_id', id).not('parent_id', 'is', null).order('created_at', { ascending:true })
+  ]);
+  currentForumReplies = (r1.data || []).map(r => ({ ...r, author: r.author || {} }));
+  currentForumLZL = (r2.data || []).map(r => ({ ...r, author: r.author || {} }));
+}
+
+// ===== 点赞 =====
+async function toggleForumLike(replyId){
+  if(!currentUser){ alert('请先登录喵'); return; }
+  if(forumLikedSet.has(replyId)){
+    const { error } = await supabaseClient.from('forum_likes').delete()
+      .eq('reply_id', replyId).eq('user_id', currentUser.id);
+    if(error){ alert('取消点赞失败：' + zhErr(error.message)); return; }
+    forumLikedSet.delete(replyId);
+  } else {
+    const { error } = await supabaseClient.from('forum_likes').insert({ reply_id: replyId, user_id: currentUser.id });
+    if(error){ alert('点赞失败：' + zhErr(error.message)); return; }
+    forumLikedSet.add(replyId);
+  }
+  await loadForumPostData(currentForumPost.id);
+  renderForumPost();
+}
+
+// ===== 吧务：置顶 / 加精 / 删帖 / 删回帖 =====
+async function toggleForumPin(){
+  const { error } = await supabaseClient.rpc('toggle_forum_pin', { p_post_id: currentForumPost.id });
+  if(error){ alert(zhErr(error.message)); return; }
+  await refreshCurrentPost();
+}
+async function toggleForumEssence(){
+  const { error } = await supabaseClient.rpc('toggle_forum_essence', { p_post_id: currentForumPost.id });
+  if(error){ alert(zhErr(error.message)); return; }
+  await refreshCurrentPost();
+}
+async function refreshCurrentPost(){
+  const { data, error } = await supabaseClient.from('forum_posts')
+    .select('id,title,content,image_url,author_id,post_type,is_pinned,is_essence,reply_count,last_reply_at,created_at,author:profiles!forum_posts_author_id_fkey(id,nickname,username,uid,role,avatar_url)')
+    .eq('id', currentForumPost.id).maybeSingle();
+  if(!error && data) currentForumPost = data;
+  renderForumPost();
+  loadForum(true);
+}
+async function deleteForumPost(){
+  if(!confirm('确定删除这个帖子吗喵？其下所有回帖也会一并删除喵。')) return;
+  const { error } = await supabaseClient.rpc('delete_forum_post', { p_post_id: currentForumPost.id });
+  if(error){ alert(zhErr(error.message)); return; }
+  alert('帖子已删除喵');
+  currentForumPost = null;
+  loadAnnouncement();
+  switchView('forum');
+  loadForum(true);
+}
+async function deleteForumReply(replyId){
+  if(!confirm('确定删除这条回帖吗喵？')) return;
+  const { error } = await supabaseClient.from('forum_replies').delete().eq('id', replyId);
+  if(error){ alert('删除失败：' + zhErr(error.message)); return; }
+  await loadForumPostData(currentForumPost.id);
+  renderForumPost();
+}
+
 </script>
 </body>
 </html>
