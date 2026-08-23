@@ -1,7 +1,11 @@
 -- ============================================================
 -- 91taffy.com 头像上传 RLS 硬修复（2026-08-23）
 -- 症状：前端报 "new row violates row-level security policy"
--- 根因：storage.objects 上的 insert 策略在生产库缺失 / 残留旧策略没清干净
+-- 真根因（已实测定位）：storage.foldername('avatars/uid/file.jpg')
+--   返回 ['avatars','uid']（PostgreSQL 数组下标从 1 开始），
+--   所以 [1]='avatars'、[2]='uid'。旧策略写 [1]=auth.uid()
+--   实际是拿 'avatars' 和 uid 比较，恒 false，导致永远被 RLS 拒。
+-- 修复：所有 foldername 索引 [1] → [2]
 -- 用法：Supabase 控制台 → SQL Editor → 整段粘贴执行（不要只跑一半）
 -- 幂等：可重复执行，不会影响已有数据
 -- ============================================================
@@ -43,7 +47,7 @@ create policy "users upload own avatar"
   on storage.objects for insert to authenticated
   with check (
     bucket_id = 'avatars'
-    and (storage.foldername(name))[1] = auth.uid()::text
+    and (storage.foldername(name))[2] = auth.uid()::text
   );
 
 -- avatars：登录用户只能改自己的头像
@@ -51,11 +55,11 @@ create policy "users update own avatar"
   on storage.objects for update to authenticated
   using (
     bucket_id = 'avatars'
-    and (storage.foldername(name))[1] = auth.uid()::text
+    and (storage.foldername(name))[2] = auth.uid()::text
   )
   with check (
     bucket_id = 'avatars'
-    and (storage.foldername(name))[1] = auth.uid()::text
+    and (storage.foldername(name))[2] = auth.uid()::text
   );
 
 -- avatars：登录用户只能删自己的头像
@@ -63,7 +67,7 @@ create policy "users delete own avatar"
   on storage.objects for delete to authenticated
   using (
     bucket_id = 'avatars'
-    and (storage.foldername(name))[1] = auth.uid()::text
+    and (storage.foldername(name))[2] = auth.uid()::text
   );
 
 -- comment-images：所有人可读
@@ -82,7 +86,7 @@ create policy "auth delete own comment-images"
   using (
     bucket_id = 'comment-images'
     and (
-      (storage.foldername(name))[1] = auth.uid()::text
+      (storage.foldername(name))[2] = auth.uid()::text
       or exists (
         select 1 from public.profiles p
         where p.id = auth.uid() and p.role = 'owner'
