@@ -1174,8 +1174,16 @@ function renderUserBar(){
 }
 
 // ========== 登录/注册 ==========
-function showLogin(){ clearErr(); document.getElementById('loginModal').classList.add('show'); }
-function showRegister(){ clearErr(); document.getElementById('regModal').classList.add('show'); }
+function showLogin(){
+  clearErr();
+  document.getElementById('regModal').classList.remove('show');   // 关掉注册弹窗，避免两个弹窗叠着导致登录弹窗不弹出
+  document.getElementById('loginModal').classList.add('show');
+}
+function showRegister(){
+  clearErr();
+  document.getElementById('loginModal').classList.remove('show'); // 关掉登录弹窗
+  document.getElementById('regModal').classList.add('show');
+}
 function closeModal(id){ document.getElementById(id).classList.remove('show'); }
 function clearErr(){
   document.getElementById('loginError').textContent='';
