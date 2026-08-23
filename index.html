@@ -2883,10 +2883,10 @@ function renderForumList(){
     document.getElementById('forumPager').style.display = 'none';
     return;
   }
-  // 排序：置顶最前（公告>置顶），再按最后回复时间（无人回按发帖时间）
+  // 排序：仅置顶贴排最前（公告/精华是独立属性，不影响排序位置），再按最后回复时间（无人回按发帖时间）
   items.sort((a,b) => {
-    const pa = a.post_type === 'notice' ? 2 : (a.is_pinned ? 1 : 0);
-    const pb = b.post_type === 'notice' ? 2 : (b.is_pinned ? 1 : 0);
+    const pa = a.is_pinned ? 1 : 0;
+    const pb = b.is_pinned ? 1 : 0;
     if(pa !== pb) return pb - pa;
     const ta = a.last_reply_at || a.created_at;
     const tb = b.last_reply_at || b.created_at;
@@ -2918,10 +2918,10 @@ function renderForumItem(p){
   const name = escapeHtml(author.nickname || author.username || '神秘用户');
   const isNotice = p.post_type === 'notice';
   const isPinned = p.is_pinned;
-  const badge = isNotice
-    ? '<span class="f-pin-badge f-pin-notice">📢 公告</span>'
-    : (isPinned ? '<span class="f-pin-badge f-pin-top">📌 置顶</span>' : '');
-  const essence = p.is_essence ? '<span class="f-essence-badge">⭐ 精</span>' : '';
+  // 三属性独立：公告/置顶/精华各自独立显示，互不覆盖
+  const badge = (isNotice ? '<span class="f-pin-badge f-pin-notice">📢 公告</span>' : '')
+    + (isPinned ? '<span class="f-pin-badge f-pin-top" style="margin-left:4px">📌 置顶</span>' : '');
+  const essence = p.is_essence ? '<span class="f-essence-badge" style="margin-left:4px">⭐ 精</span>' : '';
   // 抽奖徽标（lottery 关联存在即视为抽奖贴）
   let lotteryBadge = '';
   if(Array.isArray(p.lottery) && p.lottery.length){
@@ -3017,7 +3017,7 @@ function renderForumPost(){
   const name = escapeHtml(author.nickname || author.username || '神秘用户');
   const isOwner = currentProfile && ['owner','admin'].includes(currentProfile.role);
   const canDel = currentUser && (currentUser.id === p.author_id || isOwner);
-  document.getElementById('forumPinBtn').style.display = isOwner && p.post_type !== 'notice' ? '' : 'none';
+  document.getElementById('forumPinBtn').style.display = isOwner ? '' : 'none';
   document.getElementById('forumEssenceBtn').style.display = isOwner ? '' : 'none';
   document.getElementById('forumDelPostBtn').style.display = canDel ? '' : 'none';
   const pinText = p.is_pinned ? '取消置顶' : '📌 置顶';
