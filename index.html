@@ -285,8 +285,12 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
 .lottery-prize-row input[type=number]{width:64px;padding:7px 6px;border:1px solid rgba(178,58,99,.4);border-radius:4px;font-size:13px;color:var(--ink-900);background:#fff}
 .lottery-prize-codes{margin:6px 0 4px;padding:8px 10px;background:rgba(255,255,255,.65);border:1px dashed rgba(178,58,99,.35);border-radius:6px}
 .lottery-prize-codes .lpc-title{font-size:12px;color:var(--ink-500);margin-bottom:6px}
-.lottery-prize-codes textarea{width:100%;min-height:52px;border:1px solid rgba(178,58,99,.3);border-radius:4px;padding:6px 8px;font-size:12px;color:var(--ink-900);background:#fff;outline:none;box-sizing:border-box;font-family:ui-monospace,Consolas,monospace;resize:vertical}
-.lottery-prize-codes .lpc-tip{font-size:11px;color:var(--ink-400);margin-top:4px}
+.lottery-prize-codes .lpc-list{display:flex;flex-direction:column;gap:6px}
+.lottery-prize-codes .lpc-item{position:relative;display:flex;align-items:center;gap:6px}
+.lottery-prize-codes .lpc-item .lpc-idx{font-size:11px;color:var(--ink-400);flex-shrink:0;width:20px;text-align:right}
+.lottery-prize-codes .lpc-item input{flex:1;min-width:120px;padding:7px 9px;border:1px solid rgba(178,58,99,.3);border-radius:4px;font-size:12px;color:var(--ink-900);background:#fff;outline:none;box-sizing:border-box;font-family:ui-monospace,Consolas,monospace}
+.lottery-prize-codes .lpc-item input:focus{border-color:var(--pink-500);box-shadow:0 0 0 2px rgba(212,83,126,.15)}
+.lottery-prize-codes .lpc-tip{font-size:11px;color:var(--ink-400);margin-top:6px}
 .lottery-code-box{margin-top:8px;padding:8px 10px;background:rgba(255,255,255,.7);border:1px dashed #e9a23b;border-radius:6px;font-size:13px;color:var(--ink-800)}
 .lottery-code-box .lottery-code{font-family:ui-monospace,Consolas,monospace;font-size:14px;color:#c47f16;letter-spacing:1px;word-break:break-all}
 .lottery-quota{font-size:12px;color:var(--ink-500);margin-top:4px}
@@ -3503,15 +3507,32 @@ function addLotteryPrize(){
       <option value="virtual">虚拟</option>
       <option value="physical">实体</option>
     </select>
-    <input type="number" min="1" value="1" style="width:64px" title="中奖名额">
+    <input type="number" min="1" value="1" style="width:64px" title="中奖名额" onchange="syncPrizeCodeBoxes(this)">
     <button class="x" onclick="this.parentNode.remove()" title="删除该奖项">×</button>
     <div class="lottery-prize-codes" style="width:100%">
-      <div class="lpc-title">🔑 兑换码（每行一个，数量需 ≥ 中奖名额）</div>
-      <textarea placeholder="例如：&#10;ABCD-1234-EFGH&#10;WXYZ-5678-IJKL" title="每个中奖者会拿到一个兑换码"></textarea>
-      <div class="lpc-tip">抽中虚拟奖品的人领取后能看到兑换码并复制去兑换喵。</div>
+      <div class="lpc-title">🔑 兑换码（按中奖名额分配，中奖者领取后可见）</div>
+      <div class="lpc-list"></div>
+      <div class="lpc-tip">几个中奖名额就填几个兑换码，一一对应喵。</div>
     </div>`;
   wrap.appendChild(row);
+  syncPrizeCodeBoxes(row.querySelector('input[type=number]'));
   forumLotteryPrizeRows++;
+}
+// 根据中奖名额数量同步生成对应个数的兑换码输入框（保留已填内容）
+function syncPrizeCodeBoxes(numInput){
+  const row = numInput.closest('.lottery-prize-row');
+  const list = row.querySelector('.lpc-list');
+  const count = parseInt(numInput.value, 10) || 1;
+  const clamped = Math.min(Math.max(count, 1), 50);
+  if(clamped !== count){ numInput.value = clamped; }
+  const oldInputs = Array.from(list.querySelectorAll('input')).map(i => i.value);
+  list.innerHTML = '';
+  for(let i = 0; i < clamped; i++){
+    const item = document.createElement('div');
+    item.className = 'lpc-item';
+    item.innerHTML = `<span class="lpc-idx">${i + 1}.</span><input type="text" placeholder="第 ${i + 1} 个兑换码" value="${escapeHtml(oldInputs[i] || '')}" maxlength="100">`;
+    list.appendChild(item);
+  }
 }
 function onPrizeTypeChange(sel){
   const codes = sel.closest('.lottery-prize-row').querySelector('.lottery-prize-codes');
@@ -3527,10 +3548,10 @@ function collectLotteryPrizes(){
     if(!name) return;
     const prize = { name, type, count };
     if(type === 'virtual'){
-      const codes = r.querySelector('.lottery-prize-codes textarea').value
-        .split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+      const codes = Array.from(r.querySelectorAll('.lpc-list input'))
+        .map(i => i.value.trim()).filter(Boolean);
       if(codes.length){
-        if(codes.length < count){ throw new Error(`奖品「${name}」的兑换码数量(${codes.length})少于中奖名额(${count})，请补齐喵`); }
+        if(codes.length < count){ throw new Error(`奖品「${name}」还有 ${count - codes.length} 个兑换码没填喵`); }
         prize.codes = codes.slice(0, count);
       }
     }
