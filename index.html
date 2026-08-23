@@ -748,6 +748,7 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
       <div class="forum-post-top">
         <button class="btn btn-ghost btn-small" onclick="switchView('forum')">← 返回列表</button>
         <div style="margin-left:auto;display:flex;gap:8px">
+          <button class="btn btn-ghost btn-small" id="forumNoticeBtn" style="display:none" onclick="toggleForumNotice()">📢 公告</button>
           <button class="btn btn-ghost btn-small" id="forumPinBtn" style="display:none" onclick="toggleForumPin()">📌 置顶</button>
           <button class="btn btn-ghost btn-small" id="forumEssenceBtn" style="display:none" onclick="toggleForumEssence()">⭐ 加精</button>
           <button class="btn btn-bad btn-small" id="forumDelPostBtn" style="display:none" onclick="deleteForumPost()">删帖</button>
@@ -3017,9 +3018,12 @@ function renderForumPost(){
   const name = escapeHtml(author.nickname || author.username || '神秘用户');
   const isOwner = currentProfile && ['owner','admin'].includes(currentProfile.role);
   const canDel = currentUser && (currentUser.id === p.author_id || isOwner);
+  document.getElementById('forumNoticeBtn').style.display = isOwner ? '' : 'none';
   document.getElementById('forumPinBtn').style.display = isOwner ? '' : 'none';
   document.getElementById('forumEssenceBtn').style.display = isOwner ? '' : 'none';
   document.getElementById('forumDelPostBtn').style.display = canDel ? '' : 'none';
+  const noticeText = p.post_type === 'notice' ? '取消公告' : '📢 公告';
+  document.getElementById('forumNoticeBtn').textContent = noticeText;
   const pinText = p.is_pinned ? '取消置顶' : '📌 置顶';
   document.getElementById('forumPinBtn').textContent = pinText;
   const essenceText = p.is_essence ? '取消加精' : '⭐ 加精';
@@ -3561,7 +3565,12 @@ async function toggleForumLike(replyId){
   renderForumPost();
 }
 
-// ===== 吧务：置顶 / 加精 / 删帖 / 删回帖 =====
+// ===== 吧务：公告 / 置顶 / 加精 / 删帖 / 删回帖 =====
+async function toggleForumNotice(){
+  const { error } = await supabaseClient.rpc('toggle_forum_notice', { p_post_id: currentForumPost.id });
+  if(error){ alert(zhErr(error.message)); return; }
+  await refreshCurrentPost();
+}
 async function toggleForumPin(){
   const { error } = await supabaseClient.rpc('toggle_forum_pin', { p_post_id: currentForumPost.id });
   if(error){ alert(zhErr(error.message)); return; }
@@ -3580,6 +3589,7 @@ async function refreshCurrentPost(){
   await refreshLotteryData();
   renderForumPost();
   loadForum(true);
+  loadAnnouncement();
 }
 async function deleteForumPost(){
   if(!confirm('确定删除这个帖子吗喵？其下所有回帖也会一并删除喵。')) return;
