@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>91塔菲站 · coming soon</title>
-<meta name="description" content="91taffy.com 塔菲的小窝，正在施工中喵">
+<title>91塔菲站 · 永雏塔菲的小窝</title>
+<meta name="description" content="91taffy.com 永雏塔菲的官方小窝，塔菲论坛、抽奖、评论区都在这里喵">
 <style>
 :root{
   --bg:#ffe3f0; --card:#ffffff; --ink-900:#3a1125; --ink-600:#8e2d4f;
@@ -504,9 +504,9 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
     <div class="hero">
       <div class="paw"><img src="assets/badge.gif" alt="塔菲徽章"></div>
       <h1>91塔菲站</h1>
-      <div class="coming">coming soon<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span></div>
+      <div class="coming">欢迎来到塔菲的小窝<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span></div>
       <div class="divider"></div>
-      <p class="sub">塔菲正在从1885年的威尔士<br>开着时光机赶过来装修这个小窝喵<br>大家耐心等一等<b>，马上就好喵</b></p>
+      <p class="sub">这里是永雏塔菲的官方小窝喵<br>论坛、抽奖、留言板都开张啦<br>快来留下你的爪印<b>，和塔菲一起玩喵</b></p>
       <div class="divider"></div>
       <p class="tagline">关注永雏塔菲喵！关注永雏塔菲谢谢喵！</p>
     </div>
@@ -3015,9 +3015,6 @@ function renderForumItem(p){
   let lotteryCountHtml = '';
   if(Array.isArray(p.lottery) && p.lottery.length){
     const lt = p.lottery[0];
-    const statusText = lt.status === 'drawn'
-      ? '已开奖'
-      : (lt.deadline && new Date(lt.deadline).getTime() < Date.now() ? '已截止' : '进行中');
     lotteryBadge = `<span class="f-lottery-badge" title="抽奖贴">🎁 抽奖</span>`;
     if(lt.status === 'drawn') lotteryBadge = `<span class="f-lottery-badge" style="background:linear-gradient(180deg,#9aa5b1,#6b7683)" title="已开奖">🎁 已开奖</span>`;
     // 参与人数（列表直接显示当前参与人数，普通用户可见）
@@ -3478,11 +3475,13 @@ function renderLotteryCard(p){
       </div>`;
   }
 
+  // 奖品总名额（所有奖品 count 之和），开奖后另显示已中奖人数
+  const totalPrizeSlots = prizes.reduce((s, pr) => s + (parseInt(pr.count, 10) || 0), 0);
   return `<div class="lottery-card">
     <h4>${statusBadge} 抽奖活动 <span style="font-size:12px;color:var(--ink-400)">${modeText}</span></h4>
     <div class="lottery-prizes">${prizeHtml}</div>
     <div class="lottery-meta">
-      参与人数：<b>${entryCount}</b> 人 · 中奖名额：<b>${lt.winner_count || '待开奖'}</b> · ${deadlineText}
+      参与人数：<b>${entryCount}</b> 人 · 奖品共 <b>${totalPrizeSlots}</b> 个名额${isDrawing ? '' : ` · 已中奖 <b style="color:var(--pink-500)">${lt.winner_count || 0}</b> 人`} · ${deadlineText}
       ${bannedCount && isDrawing ? ` · 🚫 已禁抽 <b style="color:#c0392b">${bannedCount}</b> 人` : ''}
       ${quotaHtml}
       ${lt.claim_note ? `<br>🎁 ${escapeHtml(lt.claim_note)}` : ''}
@@ -3965,8 +3964,7 @@ async function submitPost(){
       const r = await supabaseClient.rpc('create_lottery_post', {
         p_title: title, p_content: content, p_prizes: prizes,
         p_image_url: imageUrl, p_claim_note: claimNote,
-        p_as_assistant: false, p_draw_mode: mode,
-        p_max_entries: maxEntries, p_deadline: deadline
+        p_draw_mode: mode, p_max_entries: maxEntries, p_deadline: deadline
       });
       if(r.error) throw new Error(zhErr(r.error.message));
       data = r.data;
