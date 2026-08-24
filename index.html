@@ -965,7 +965,7 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
       </div>
       <div class="auth-tip"><a onclick="backToForgotStep1()">返回验证码找回</a></div>
     </div>
-    <div class="auth-tip">收不到验证码？<a onclick="showForgotAppeal()">联系站长申诉</a></div>
+    <div class="auth-tip" id="forgotAppealLink">收不到验证码？<a onclick="showForgotAppeal()">联系站长申诉</a></div>
     <div class="auth-tip"><a onclick="closeModal('forgotModal')">关闭</a></div>
   </div>
 </div>
@@ -1599,6 +1599,7 @@ function showForgot(){
   document.getElementById('forgotStep1').style.display = '';
   document.getElementById('forgotStep2').style.display = 'none';
   document.getElementById('forgotAppealPanel').style.display = 'none';
+  document.getElementById('forgotAppealLink').style.display = '';   // 每次打开都恢复底部入口
   document.getElementById('forgotError').textContent = '';
   document.getElementById('forgotCode').value = '';
   document.getElementById('forgotNewPass').value = '';
@@ -1618,10 +1619,12 @@ function showForgotAppeal(){
   document.getElementById('forgotStep1').style.display = 'none';
   document.getElementById('forgotStep2').style.display = 'none';
   document.getElementById('forgotAppealPanel').style.display = '';
+  document.getElementById('forgotAppealLink').style.display = 'none';  // 隐藏底部入口，避免重复显示
 }
 function backToForgotStep1(){
   document.getElementById('forgotAppealPanel').style.display = 'none';
   document.getElementById('forgotStep1').style.display = '';
+  document.getElementById('forgotAppealLink').style.display = '';  // 恢复底部入口
 }
 // 复制站长联系方式（兼容 iOS：用 execCommand 兜底）
 function copyAppeal(id){
