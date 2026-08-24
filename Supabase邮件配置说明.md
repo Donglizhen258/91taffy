@@ -12,9 +12,12 @@
 | SMTP 发件人 | `91塔菲站` | Sender name |
 | 验证码位数 | `6` | 与前端 `maxlength=6` 一致 ✅ |
 | 验证码有效期 | `600s`（10 分钟） | 与前端提示一致 ✅ |
-| Magic Link 邮件模板 | `您的登录验证码是：{{ .Token }}，10 分钟内有效` | 用 Token 而非 ConfirmationURL → 发验证码而非链接 ✅ |
-| Confirmation 模板 | 同上（Token） | signUp 验证邮件同样用验证码样式 |
-| 主题（Magic Link） | `91塔菲站验证码` | |
+| Magic Link 邮件模板 | 塔菲口吻（见下方「邮件文案」）| 用 Token 而非 ConfirmationURL → 发验证码而非链接 ✅ |
+| Confirmation 模板 | 塔菲口吻（见下方「邮件文案」）| signUp 验证邮件同样用验证码样式 |
+| Recovery 模板 | 塔菲口吻（见下方「邮件文案」）| 找回密码邮件 |
+| 主题（Magic Link） | `来自塔菲的验证码喵~` | |
+| 主题（Confirmation） | `欢迎来到 91塔菲站 喵！` | |
+| 主题（Recovery） | `塔菲帮你找回密码喵！` | |
 | mailer_autoconfirm | `false` | 需要验证，符合注册流程 |
 
 ## 关键原理（避免再踩坑）
@@ -24,6 +27,13 @@
   - 模板含 `{{ .Token }}` → 用户收到 **6 位验证码**
 - 两者共用同一底层实现，改 Magic Link 模板即可影响 OTP 邮件。
 - 前端 `verifyOtp({ email, token, type:'email' })` 校验验证码，校验通过即进入登录态。
+
+## 邮件文案（塔菲口吻，2026-08-24 更新）
+
+- **注册验证码（Magic Link / Confirmation 模板）**：主题 `来自塔菲的验证码喵~` / `欢迎来到 91塔菲站 喵！`，正文粉色大字 `{{ .Token }}` + 「10 分钟内有效喵，千万别告诉别人哦~」+ 结尾「—— 永雏塔菲 🐾」
+- **找回密码（Recovery 模板）**：主题 `塔菲帮你找回密码喵！`，正文粉色按钮 `点这里重置密码喵` 链接 `{{ .ConfirmationURL }}`
+- 注意：前端找回密码走 `signInWithOtp(shouldCreateUser:false)`，实际收到的是 **Magic Link 模板**的验证码邮件；Recovery 模板仅在 Supabase 内置「忘记密码」链路（sendPasswordResetEmail）触发时使用，前端当前不用，但为完整性也改成了塔菲口吻。
+- 改法：PATCH `mailer_subjects_magic_link` / `mailer_templates_magic_link_content` / `mailer_subjects_confirmation` / `mailer_templates_confirmation_content` / `mailer_subjects_recovery` / `mailer_templates_recovery_content` 字段。
 
 ## 如何用 API 查看/修改（无需打开网页控制台）
 
