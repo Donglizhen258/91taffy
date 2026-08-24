@@ -956,6 +956,15 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
       <div class="field"><label>再次输入</label><input id="forgotNewPass2" type="password" placeholder="再输一次"></div>
       <button class="btn" style="width:100%" onclick="submitNewPassword()">确认修改密码</button>
     </div>
+    <!-- 联系站长申诉：展示联系方式供用户自行复制，避免 mailto 在部分设备上打不开 -->
+    <div id="forgotAppealPanel" style="display:none">
+      <div style="font-size:13px;color:var(--ink-700);margin-bottom:10px;line-height:1.6">
+        收不到验证码时，请通过以下方式联系站长申诉，说明你的<b>注册邮箱</b>和<b>昵称</b>，站长核实后会帮你重置密码喵：<br><br>
+        📧 站长邮箱：<b id="appealEmail">taffy91@foxmail.com</b>　<button class="btn btn-small" onclick="copyAppeal('appealEmail')">复制</button><br>
+        💬 站长 QQ：<b id="appealQQ">1301535058</b>　<button class="btn btn-small" onclick="copyAppeal('appealQQ')">复制</button>
+      </div>
+      <div class="auth-tip"><a onclick="backToForgotStep1()">返回验证码找回</a></div>
+    </div>
     <div class="auth-tip">收不到验证码？<a onclick="showForgotAppeal()">联系站长申诉</a></div>
     <div class="auth-tip"><a onclick="closeModal('forgotModal')">关闭</a></div>
   </div>
@@ -1589,6 +1598,7 @@ function showForgot(){
   document.getElementById('loginModal').classList.remove('show');
   document.getElementById('forgotStep1').style.display = '';
   document.getElementById('forgotStep2').style.display = 'none';
+  document.getElementById('forgotAppealPanel').style.display = 'none';
   document.getElementById('forgotError').textContent = '';
   document.getElementById('forgotCode').value = '';
   document.getElementById('forgotNewPass').value = '';
@@ -1600,11 +1610,51 @@ function showForgot(){
   forgotVerified = false;
   document.getElementById('forgotModal').classList.add('show');
 }
-// 联系站长申诉
+// 联系站长申诉：切到申诉面板展示联系方式（避免 mailto 在 iOS 无邮件 App 时打不开）
 function showForgotAppeal(){
-  const mailto = 'mailto:taffy91@foxmail.com?subject=' + encodeURIComponent('91taffy 账号申诉：忘记密码') +
-    '&body=' + encodeURIComponent('你好站长喵，我忘记了账号密码，无法通过验证码找回，麻烦帮我处理一下喵。\n\n我的注册邮箱：\n我的昵称：');
-  window.location.href = mailto;
+  const err = document.getElementById('forgotError');
+  err.classList.remove('ok');
+  err.textContent = '';
+  document.getElementById('forgotStep1').style.display = 'none';
+  document.getElementById('forgotStep2').style.display = 'none';
+  document.getElementById('forgotAppealPanel').style.display = '';
+}
+function backToForgotStep1(){
+  document.getElementById('forgotAppealPanel').style.display = 'none';
+  document.getElementById('forgotStep1').style.display = '';
+}
+// 复制站长联系方式（兼容 iOS：用 execCommand 兜底）
+function copyAppeal(id){
+  const el = document.getElementById(id);
+  const text = el.textContent.trim();
+  const done = () => {
+    const err = document.getElementById('forgotError');
+    err.classList.add('ok');
+    err.textContent = '✓ 已复制：' + text + '，去邮箱/QQ粘贴发送给站长即可喵';
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(done, ()=>{
+      fallbackCopy(text, el, done);
+    });
+  } else {
+    fallbackCopy(text, el, done);
+  }
+}
+function fallbackCopy(text, el, done){
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try{
+    document.execCommand('copy');
+    done();
+  }catch(e){
+    const err = document.getElementById('forgotError');
+    err.textContent = '复制失败，请手动长按复制：' + text + ' 喵';
+  }
+  document.body.removeChild(ta);
 }
 // 发送找回验证码（仅校验邮箱，跟注册一致；用 signInWithOtp type=recovery 会让模板走 reset password，但我们用验证码方式，
 // 直接发 signInWithOtp(email, shouldCreateUser:false)，用户收到的是 magic_link/OTP 模板里的验证码）
