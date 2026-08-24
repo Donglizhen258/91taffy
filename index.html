@@ -910,6 +910,13 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
     <h3>注册新账号</h3>
     <div class="auth-error" id="regError"></div>
     <div class="field"><label>邮箱</label><input id="regEmail" type="email" placeholder="例如 xxx@qq.com"></div>
+    <div class="field" id="regCodeField">
+      <label>邮箱验证码</label>
+      <div style="display:flex;gap:8px">
+        <input id="regCode" type="text" inputmode="numeric" maxlength="6" placeholder="先点右侧发送，再回填6位码" style="flex:1;min-width:0">
+        <button class="btn btn-small" id="regSendBtn" style="white-space:nowrap" onclick="sendRegCode()">发送验证码</button>
+      </div>
+    </div>
     <div class="field"><label>昵称</label><input id="regNick" placeholder="你的昵称"></div>
     <div class="field"><label>密码</label><input id="regPass" type="password" placeholder="至少6位"></div>
     <div class="field"><label>性别</label>
@@ -918,13 +925,6 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
         <option value="男">男</option>
         <option value="女">女</option>
       </select>
-    </div>
-    <div class="field" id="regCodeField">
-      <label>邮箱验证码</label>
-      <div style="display:flex;gap:8px">
-        <input id="regCode" type="text" inputmode="numeric" maxlength="6" placeholder="先点右侧发送，再回填6位码" style="flex:1;min-width:0">
-        <button class="btn btn-small" id="regSendBtn" style="white-space:nowrap" onclick="sendRegCode()">发送验证码</button>
-      </div>
     </div>
     <button class="btn" id="regBtn" style="width:100%" onclick="doRegister()">注册</button>
     <div class="auth-tip">已有账号？<a onclick="showLogin()">去登录</a></div>
@@ -1656,8 +1656,8 @@ async function sendRegCode(){
   document.getElementById('regCode').focus();
   err.classList.add('ok');
   err.textContent = '✓ 验证码已发送到邮箱，请查收（10分钟内有效）喵';
-  let left = 60;
-  sendBtn.innerHTML = `重新发送(${left}s)`;
+  let left = 15;
+  sendBtn.innerHTML = `发送验证码(${left}s)`;
   if(regSendTimer) clearInterval(regSendTimer);
   regSendTimer = setInterval(()=>{
     left--;
@@ -1665,9 +1665,9 @@ async function sendRegCode(){
       clearInterval(regSendTimer);
       regSendTimer = null;
       sendBtn.disabled = false;
-      sendBtn.innerHTML = '重新发送';
+      sendBtn.innerHTML = '发送验证码';
     } else {
-      sendBtn.innerHTML = `重新发送(${left}s)`;
+      sendBtn.innerHTML = `发送验证码(${left}s)`;
     }
   }, 1000);
 }
