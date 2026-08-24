@@ -2296,9 +2296,13 @@ async function loadProfile(userId){
   metaParts.push(`加入：${new Date(p.created_at).toLocaleDateString('zh-CN')}`);
   document.getElementById('profileMeta').textContent = metaParts.join('　');
   document.getElementById('profileBio').textContent = p.bio || '这个人很懒，什么都没写喵~';
-  // 封禁区：站长/管理员可封禁他人（不能封禁自己、不能封禁站长）
+  // 封禁区：站长可封禁除自己/站长外的人（含管理员）；管理员只能封禁普通用户（与后端权限一致）
   const banArea = document.getElementById('profileBanArea');
-  const canManage = currentProfile && ['owner','admin'].includes(currentProfile.role) && currentUser.id !== userId && p.role !== 'owner';
+  const isOwnerMe = currentProfile && currentProfile.role === 'owner';
+  const isAdminMe = currentProfile && currentProfile.role === 'admin';
+  const canManage = currentUser && currentUser.id !== userId && (
+    (isOwnerMe && p.role !== 'owner') || (isAdminMe && p.role === 'user')
+  );
   if(canManage){
     banArea.style.display = 'block';
     document.getElementById('profileBanStatus').textContent = banStatusText(p);
