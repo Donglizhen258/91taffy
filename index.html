@@ -220,6 +220,18 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
 .notice-meta{font-size:12px;color:var(--ink-400);margin-top:3px}
 .notice-go{font-size:13px;color:var(--pink-500);cursor:pointer;white-space:nowrap;flex-shrink:0}
 .notice-go:hover{text-decoration:underline}
+/* 首页公告三栏位 */
+.notice-slots{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.notice-slot{display:flex;align-items:center;gap:10px;padding:12px 14px;
+  background:linear-gradient(180deg,#fdf2f6,#fbe3ec);border:1px solid rgba(212,83,126,.35);
+  border-radius:8px;cursor:pointer;transition:transform .15s,box-shadow .15s}
+.notice-slot:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(178,58,99,.15)}
+.notice-slot .notice-text{font-size:13px}
+@media (max-width:720px){.notice-slots{grid-template-columns:1fr}}
+/* 公告栏位设置器（详情页内，仅管理层可见） */
+.notice-slot-setter{margin:10px 0;padding:10px 12px;background:rgba(245,247,255,.7);
+  border:1px dashed rgba(120,120,220,.4);border-radius:8px}
+.nss-head{font-size:13px;color:var(--ink-700);margin-bottom:6px}
 /* 论坛头部 */
 .forum-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
 .forum-head h2{font-size:19px;color:var(--ink-700)}
@@ -500,15 +512,33 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
     </div>
   </div>
 
-  <!-- 首页公告横幅（论坛公告贴自动同步显示，仅站长/管理员可发） -->
+  <!-- 首页公告横幅（三个栏位，站长/管理员可调整每个栏位展示的公告帖） -->
   <div class="card" id="homeNoticeCard" style="display:none">
-    <div class="notice-banner" id="homeNoticeContent">
-      <span class="notice-ico">📢</span>
-      <div class="notice-body">
-        <div class="notice-text" id="homeNoticeText"></div>
-        <div class="notice-meta" id="homeNoticeMeta"></div>
+    <div class="notice-slots" id="homeNoticeSlots">
+      <div class="notice-slot" id="homeNoticeSlot1" style="display:none" onclick="openNoticeSlot(1)">
+        <span class="notice-ico">📢</span>
+        <div class="notice-body">
+          <div class="notice-text" id="homeNoticeText1"></div>
+          <div class="notice-meta" id="homeNoticeMeta1"></div>
+        </div>
+        <a class="notice-go">去查看 →</a>
       </div>
-      <a class="notice-go" onclick="openForumPostFromNotice()">去查看 →</a>
+      <div class="notice-slot" id="homeNoticeSlot2" style="display:none" onclick="openNoticeSlot(2)">
+        <span class="notice-ico">📢</span>
+        <div class="notice-body">
+          <div class="notice-text" id="homeNoticeText2"></div>
+          <div class="notice-meta" id="homeNoticeMeta2"></div>
+        </div>
+        <a class="notice-go">去查看 →</a>
+      </div>
+      <div class="notice-slot" id="homeNoticeSlot3" style="display:none" onclick="openNoticeSlot(3)">
+        <span class="notice-ico">📢</span>
+        <div class="notice-body">
+          <div class="notice-text" id="homeNoticeText3"></div>
+          <div class="notice-meta" id="homeNoticeMeta3"></div>
+        </div>
+        <a class="notice-go">去查看 →</a>
+      </div>
     </div>
   </div>
 
@@ -816,20 +846,6 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
       <div id="postImgPreview" style="display:none;margin-top:8px;position:relative">
         <img id="postImgPreviewImg" alt="预览" style="max-width:200px;max-height:150px;border-radius:6px">
         <button class="x" style="position:absolute;top:-8px;right:-8px" onclick="removePostImg()">×</button>
-      </div>
-    </div>
-    <div class="post-field" id="postTypeRow" style="display:none">
-      <label>帖子类型</label>
-      <select id="postType" onchange="onPostTypeChange()">
-        <option value="post">普通帖</option>
-        <option value="notice">📢 公告贴（首页顶端显示，仅站长/管理员）</option>
-      </select>
-    </div>
-    <div class="post-field" id="postAsRow" style="display:none">
-      <div class="post-author-row">
-        <label style="margin:0;display:flex;align-items:center;gap:6px;cursor:pointer">
-          <input type="checkbox" id="postAsAssistant"> 以「站内管家」(UID 1) 身份发布
-        </label>
       </div>
     </div>
     <div class="post-field" id="postLotteryRow" style="display:none">
@@ -2862,37 +2878,55 @@ let currentLotteryDisplayWinners = []; // 展示用中奖名单（RPC 脱敏/完
 let currentLotteryBans = [];       // 当前帖子禁抽名单（仅楼主/站长/管理员可见）
 let currentLotteryPrizeStatus = []; // 奖品分配明细（仅楼主/站长/管理员可见，用于回收未抽完的虚拟奖品）
 
-// ===== 公告横幅（首页顶端） =====
+// ===== 公告横幅（首页顶端，三栏位） =====
+let noticeSlotPosts = { 1: null, 2: null, 3: null };
 async function loadAnnouncement(){
   const card = document.getElementById('homeNoticeCard');
   if(!card) return;
   try{
     const { data, error } = await supabaseClient
       .from('forum_posts')
-      .select('id,title,content,author_id,created_at,author:profiles!forum_posts_author_id_fkey(nickname,username)')
+      .select('id,title,content,author_id,created_at,notice_slot,author:profiles!forum_posts_author_id_fkey(nickname,username)')
       .eq('post_type', 'notice')
-      .order('created_at', { ascending:false })
-      .limit(1);
+      .not('notice_slot', 'is', null)
+      .order('notice_slot', { ascending:true });
     if(error || !data || !data.length){
       card.style.display = 'none';
+      noticeSlotPosts = { 1: null, 2: null, 3: null };
       return;
     }
-    const n = data[0];
-    const author = n.author || {};
-    const name = author.nickname || author.username || '神秘用户';
-    document.getElementById('homeNoticeText').innerHTML = '📢 ' + escapeHtml(n.title);
-    document.getElementById('homeNoticeMeta').textContent = `${name} · ${fmtTime(n.created_at)}`;
-    card.dataset.postId = n.id;
-    card.style.display = '';
+    // 重置
+    noticeSlotPosts = { 1: null, 2: null, 3: null };
+    let anyVisible = false;
+    data.forEach(n => {
+      const slot = n.notice_slot;
+      if(slot >= 1 && slot <= 3){
+        noticeSlotPosts[slot] = n;
+      }
+    });
+    // 渲染三个栏位
+    for(let i = 1; i <= 3; i++){
+      const slotEl = document.getElementById('homeNoticeSlot' + i);
+      const n = noticeSlotPosts[i];
+      if(n){
+        const author = n.author || {};
+        const name = author.nickname || author.username || '神秘用户';
+        document.getElementById('homeNoticeText' + i).innerHTML = '📢 ' + escapeHtml(n.title);
+        document.getElementById('homeNoticeMeta' + i).textContent = `${name} · ${fmtTime(n.created_at)}`;
+        slotEl.style.display = '';
+        anyVisible = true;
+      } else {
+        slotEl.style.display = 'none';
+      }
+    }
+    card.style.display = anyVisible ? '' : 'none';
   }catch(e){
     card.style.display = 'none';
   }
 }
-function openForumPostFromNotice(){
-  const card = document.getElementById('homeNoticeCard');
-  if(card && card.dataset.postId){
-    openForumPost(card.dataset.postId);
-  }
+function openNoticeSlot(slot){
+  const n = noticeSlotPosts[slot];
+  if(n && n.id) openForumPost(n.id);
 }
 
 // ===== 论坛帖子列表 =====
@@ -2906,7 +2940,7 @@ async function loadForum(reset){
   list.innerHTML = `<div class="loading">加载中喵...</div>`;
   const { data, error } = await supabaseClient
     .from('forum_posts')
-    .select('id,title,content,image_url,author_id,post_type,is_pinned,is_essence,reply_count,last_reply_at,created_at,lottery:forum_lotteries(post_id,status,prizes,deadline,winner_count,claim_note,draw_mode,max_entries,entry_count,banned_count),author:profiles!forum_posts_author_id_fkey(id,nickname,username,uid,role,avatar_url)')
+    .select('id,title,content,image_url,author_id,post_type,is_pinned,is_essence,notice_slot,reply_count,last_reply_at,created_at,lottery:forum_lotteries(post_id,status,prizes,deadline,winner_count,claim_note,draw_mode,max_entries,entry_count,banned_count),author:profiles!forum_posts_author_id_fkey(id,nickname,username,uid,role,avatar_url)')
     .order('created_at', { ascending:false });
   if(error){
     list.innerHTML = `<div class="empty">加载失败：${zhErr(error.message)}</div>`;
@@ -2969,7 +3003,8 @@ function renderForumItem(p){
   const isPinned = p.is_pinned;
   // 三属性独立：公告/置顶/精华各自独立显示，互不覆盖
   const badge = (isNotice ? '<span class="f-pin-badge f-pin-notice">📢 公告</span>' : '')
-    + (isPinned ? '<span class="f-pin-badge f-pin-top" style="margin-left:4px">📌 置顶</span>' : '');
+    + (isPinned ? '<span class="f-pin-badge f-pin-top" style="margin-left:4px">📌 置顶</span>' : '')
+    + (p.notice_slot ? `<span class="f-pin-badge" style="margin-left:4px;background:linear-gradient(180deg,#7f9cf5,#5a67d8)" title="首页公告栏位">🔝 栏位${p.notice_slot}</span>` : '');
   const essence = p.is_essence ? '<span class="f-essence-badge" style="margin-left:4px">⭐ 精</span>' : '';
   // 抽奖徽标（lottery 关联存在即视为抽奖贴）
   let lotteryBadge = '';
@@ -3014,7 +3049,7 @@ async function openForumPost(id){
   if(!id){ alert('帖子不存在喵'); return; }
   const { data, error } = await supabaseClient
     .from('forum_posts')
-    .select('id,title,content,image_url,author_id,post_type,is_pinned,is_essence,reply_count,last_reply_at,created_at,author:profiles!forum_posts_author_id_fkey(id,nickname,username,uid,role,avatar_url)')
+    .select('id,title,content,image_url,author_id,post_type,is_pinned,is_essence,notice_slot,reply_count,last_reply_at,created_at,author:profiles!forum_posts_author_id_fkey(id,nickname,username,uid,role,avatar_url)')
     .eq('id', id)
     .maybeSingle();
   if(error || !data){
@@ -3180,14 +3215,43 @@ function renderForumPost(){
     </div>`;
   // 抽奖卡片（若为抽奖贴）
   const lotteryHtml = currentLottery ? renderLotteryCard(p) : '';
+  // 公告栏位设置（仅公告帖 + 站长/管理员可见）：把公告指派到首页栏位 1/2/3
+  let noticeSlotHtml = '';
+  if(p.post_type === 'notice' && isOwner){
+    const curSlot = p.notice_slot;
+    const slotOpts = [1,2,3].map(s =>
+      `<button class="btn ${curSlot === s ? 'btn-ok' : 'btn-ghost'} btn-small" onclick="setNoticeSlot(${s})">栏位 ${s}</button>`
+    ).join('');
+    noticeSlotHtml = `
+      <div class="notice-slot-setter">
+        <div class="nss-head">📌 首页公告栏位（仅站长/管理员可见）：</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          ${slotOpts}
+          ${curSlot ? `<button class="btn btn-ghost btn-small" onclick="setNoticeSlot(null)">移除栏位</button>` : ''}
+        </div>
+        <div style="font-size:11px;color:var(--ink-400);margin-top:4px">把一个公告帖指派到某个栏位后，该栏位原来的公告会被顶掉；同一栏位只显示一篇公告喵。</div>
+      </div>`;
+  }
   body.innerHTML = `
     <div class="forum-post-title">${typeBadge}${pinBadge}${essenceBadge} ${escapeHtml(p.title)}</div>
     <div class="forum-post-meta"><span>共 ${currentForumReplies.length} 条回帖</span></div>
+    ${noticeSlotHtml}
     ${lzHtml}
     ${lotteryHtml}
     <div class="fp-floor-head">回帖楼层</div>
     ${repliesHtml}
     ${replyBox}`;
+}
+
+// 设置公告栏位（仅站长/管理员）
+async function setNoticeSlot(slot){
+  if(!currentForumPost) return;
+  const { error } = await supabaseClient.rpc('set_notice_slot', {
+    p_post_id: currentForumPost.id, p_slot: slot
+  });
+  if(error){ alert(zhErr(error.message)); return; }
+  await refreshCurrentPost();
+  await loadAnnouncement();
 }
 
 // ===== 抽奖贴卡片 =====
@@ -3672,10 +3736,6 @@ function renderForumLZL(l, parent){
 function showPostModal(){
   if(!currentUser){ alert('请先登录喵'); return; }
   const isAdmin = currentProfile && ['owner','admin'].includes(currentProfile.role);
-  document.getElementById('postTypeRow').style.display = isAdmin ? '' : 'none';
-  document.getElementById('postType').value = 'post';
-  document.getElementById('postAsRow').style.display = 'none';
-  document.getElementById('postAsAssistant').checked = false;
   document.getElementById('postTitle').value = '';
   document.getElementById('postContent').value = '';
   document.getElementById('postError').textContent = '';
@@ -3699,23 +3759,9 @@ function showPostModal(){
   removePostImg();
   document.getElementById('postModal').classList.add('show');
 }
-function onPostTypeChange(){
-  const t = document.getElementById('postType').value;
-  document.getElementById('postAsRow').style.display = t === 'notice' ? '' : 'none';
-}
 function onPostLotteryToggle(){
   const on = document.getElementById('postIsLottery').checked;
   document.getElementById('postLotteryConfig').style.display = on ? '' : 'none';
-  // 抽奖贴固定为普通帖（避免与公告类型冲突，公告/置顶/精华可事后独立设置）
-  if(on){
-    document.getElementById('postType').value = 'post';
-    document.getElementById('postTypeRow').style.display = 'none';
-    document.getElementById('postAsRow').style.display = 'none';
-  } else {
-    const isAdmin = currentProfile && ['owner','admin'].includes(currentProfile.role);
-    document.getElementById('postTypeRow').style.display = isAdmin ? '' : 'none';
-    onPostTypeChange();
-  }
   if(on) onLotteryModeChange();
 }
 function onLotteryModeChange(){
@@ -3827,8 +3873,7 @@ async function submitPost(){
   const content = document.getElementById('postContent').value.trim();
   if(!title){ err.textContent = '请填写标题喵'; return; }
   if(!content){ err.textContent = '请填写正文喵'; return; }
-  const type = document.getElementById('postType').value;
-  const asAssistant = document.getElementById('postAsAssistant') && document.getElementById('postAsAssistant').checked;
+  // 发帖统一为普通帖，公告/置顶/精华均可发布后在详情页通过按钮独立设置
   const isLottery = document.getElementById('postIsLottery') && document.getElementById('postIsLottery').checked;
   const prizes = isLottery ? collectLotteryPrizes() : [];
   if(isLottery && !prizes.length){ err.textContent = '抽奖贴至少要有一个有效的奖项喵'; return; }
@@ -3883,15 +3928,14 @@ async function submitPost(){
       const r = await supabaseClient.rpc('create_lottery_post', {
         p_title: title, p_content: content, p_prizes: prizes,
         p_image_url: imageUrl, p_claim_note: claimNote,
-        p_as_assistant: asAssistant, p_draw_mode: mode,
+        p_as_assistant: false, p_draw_mode: mode,
         p_max_entries: maxEntries, p_deadline: deadline
       });
       if(r.error) throw new Error(zhErr(r.error.message));
       data = r.data;
     } else {
       const { data: d, error } = await supabaseClient.rpc('create_forum_post', {
-        p_title: title, p_content: content, p_image_url: imageUrl,
-        p_type: type, p_as_assistant: asAssistant
+        p_title: title, p_content: content, p_image_url: imageUrl
       });
       if(error) throw new Error(zhErr(error.message));
       data = d;
@@ -4013,7 +4057,7 @@ async function toggleForumEssence(){
 }
 async function refreshCurrentPost(){
   const { data, error } = await supabaseClient.from('forum_posts')
-    .select('id,title,content,image_url,author_id,post_type,is_pinned,is_essence,reply_count,last_reply_at,created_at,author:profiles!forum_posts_author_id_fkey(id,nickname,username,uid,role,avatar_url)')
+    .select('id,title,content,image_url,author_id,post_type,is_pinned,is_essence,notice_slot,reply_count,last_reply_at,created_at,author:profiles!forum_posts_author_id_fkey(id,nickname,username,uid,role,avatar_url)')
     .eq('id', currentForumPost.id).maybeSingle();
   if(!error && data) currentForumPost = data;
   await refreshLotteryData();
