@@ -899,6 +899,7 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
     <div class="field" id="loginAccountField" style="display:none"><label>账号（昵称）</label><input id="loginAccount" type="text" placeholder="你的昵称或用户名"></div>
     <div class="field"><label>密码</label><input id="loginPass" type="password" placeholder="密码"></div>
     <button class="btn" id="loginBtn" style="width:100%" onclick="doLogin()">登录</button>
+    <div class="auth-tip"><a onclick="showForgot()">忘记密码？</a></div>
     <div class="auth-tip">还没有账号？<a onclick="showRegister()">去注册</a></div>
     <div class="auth-tip"><a onclick="closeModal('loginModal')">关闭</a></div>
   </div>
@@ -929,6 +930,34 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
     <button class="btn" id="regBtn" style="width:100%" onclick="doRegister()">注册</button>
     <div class="auth-tip">已有账号？<a onclick="showLogin()">去登录</a></div>
     <div class="auth-tip"><a onclick="closeModal('regModal')">关闭</a></div>
+  </div>
+</div>
+
+<!-- 找回密码弹窗（验证码流程：填邮箱→发验证码→输6位码→设新密码；或联系站长申诉） -->
+<div class="modal-mask" id="forgotModal">
+  <div class="modal">
+    <h3>找回密码</h3>
+    <div class="auth-error" id="forgotError"></div>
+    <!-- 步骤一：填邮箱发验证码 -->
+    <div id="forgotStep1">
+      <div class="field"><label>注册邮箱</label><input id="forgotEmail" type="email" placeholder="输入你注册时用的邮箱"></div>
+      <div class="field" id="forgotCodeField">
+        <label>邮箱验证码</label>
+        <div style="display:flex;gap:8px">
+          <input id="forgotCode" type="text" inputmode="numeric" maxlength="6" placeholder="先点右侧发送，再回填6位码" style="flex:1;min-width:0">
+          <button class="btn btn-small" id="forgotSendBtn" style="white-space:nowrap" onclick="sendForgotCode()">发送验证码</button>
+        </div>
+      </div>
+      <button class="btn" style="width:100%" onclick="verifyForgotCode()">验证并继续</button>
+    </div>
+    <!-- 步骤二：设置新密码 -->
+    <div id="forgotStep2" style="display:none">
+      <div class="field"><label>新密码</label><input id="forgotNewPass" type="password" placeholder="至少6位"></div>
+      <div class="field"><label>再次输入</label><input id="forgotNewPass2" type="password" placeholder="再输一次"></div>
+      <button class="btn" style="width:100%" onclick="submitNewPassword()">确认修改密码</button>
+    </div>
+    <div class="auth-tip">收不到验证码？<a onclick="showForgotAppeal()">联系站长申诉</a></div>
+    <div class="auth-tip"><a onclick="closeModal('forgotModal')">关闭</a></div>
   </div>
 </div>
 
@@ -1547,6 +1576,149 @@ function closeModal(id){ document.getElementById(id).classList.remove('show'); }
 function clearErr(){
   document.getElementById('loginError').textContent='';
   document.getElementById('regError').textContent='';
+  const fe = document.getElementById('forgotError');
+  if(fe) fe.textContent='';
+}
+// ========== 找回密码（验证码流程） ==========
+let forgotSendTimer = null;
+let forgotSentEmail = '';    // 当前已发验证码的邮箱
+let forgotVerified = false;  // 验证码是否已核验通过
+// 打开找回密码弹窗（从登录弹窗进入）
+function showForgot(){
+  clearErr();
+  document.getElementById('loginModal').classList.remove('show');
+  document.getElementById('forgotStep1').style.display = '';
+  document.getElementById('forgotStep2').style.display = 'none';
+  document.getElementById('forgotError').textContent = '';
+  document.getElementById('forgotCode').value = '';
+  document.getElementById('forgotNewPass').value = '';
+  document.getElementById('forgotNewPass2').value = '';
+  document.getElementById('forgotSendBtn').disabled = false;
+  document.getElementById('forgotSendBtn').textContent = '发送验证码';
+  if(forgotSendTimer){ clearInterval(forgotSendTimer); forgotSendTimer = null; }
+  forgotSentEmail = '';
+  forgotVerified = false;
+  document.getElementById('forgotModal').classList.add('show');
+}
+// 联系站长申诉
+function showForgotAppeal(){
+  const mailto = 'mailto:taffy91@foxmail.com?subject=' + encodeURIComponent('91taffy 账号申诉：忘记密码') +
+    '&body=' + encodeURIComponent('你好站长喵，我忘记了账号密码，无法通过验证码找回，麻烦帮我处理一下喵。\n\n我的注册邮箱：\n我的昵称：');
+  window.location.href = mailto;
+}
+// 发送找回验证码（仅校验邮箱，跟注册一致；用 signInWithOtp type=recovery 会让模板走 reset password，但我们用验证码方式，
+// 直接发 signInWithOtp(email, shouldCreateUser:false)，用户收到的是 magic_link/OTP 模板里的验证码）
+async function sendForgotCode(){
+  const email = document.getElementById('forgotEmail').value.trim();
+  const err = document.getElementById('forgotError');
+  const sendBtn = document.getElementById('forgotSendBtn');
+  err.classList.remove('ok');
+  if(!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ err.textContent='请输入正确的邮箱喵'; return; }
+  if(!supabaseClient){ err.textContent='服务暂不可用，请稍后重试喵'; return; }
+  sendBtn.disabled = true;
+  sendBtn.innerHTML = '<span class="spinner"></span>发送中';
+  const { error } = await withTimeout(
+    supabaseClient.auth.signInWithOtp({
+      email,
+      options:{ shouldCreateUser:false }   // 找回密码不新建账号
+    }),
+    15000,
+    { error: { message: '__TIMEOUT__' } }
+  );
+  if(error){
+    sendBtn.disabled = false;
+    sendBtn.innerHTML = '发送验证码';
+    // 账号不存在时 Supabase 为防枚举也返回成功提示，这里把明确报错显示出来
+    err.textContent = (error.message === '__TIMEOUT__')
+      ? '发送超时，请检查网络后重试喵'
+      : zhErr(error.message);
+    return;
+  }
+  forgotSentEmail = email;
+  forgotVerified = false;
+  err.classList.add('ok');
+  err.textContent = '✓ 验证码已发送，请查收邮箱（10分钟内有效）喵';
+  let left = 15;
+  sendBtn.innerHTML = `发送验证码(${left}s)`;
+  if(forgotSendTimer) clearInterval(forgotSendTimer);
+  forgotSendTimer = setInterval(()=>{
+    left--;
+    if(left <= 0){
+      clearInterval(forgotSendTimer);
+      forgotSendTimer = null;
+      sendBtn.disabled = false;
+      sendBtn.innerHTML = '发送验证码';
+    } else {
+      sendBtn.innerHTML = `发送验证码(${left}s)`;
+    }
+  }, 1000);
+}
+// 校验验证码（type=email，复用与注册一致的 OTP 验证；通过即认为邮箱所有权确认）
+async function verifyForgotCode(){
+  const email = document.getElementById('forgotEmail').value.trim();
+  const code = document.getElementById('forgotCode').value.trim();
+  const err = document.getElementById('forgotError');
+  err.classList.remove('ok');
+  if(!forgotSentEmail || forgotSentEmail !== email){ err.textContent='请先点击「发送验证码」喵'; return; }
+  if(!/^\d{6}$/.test(code)){ err.textContent='请输入邮箱里收到的6位数字验证码喵'; return; }
+  const { error } = await withTimeout(
+    supabaseClient.auth.verifyOtp({ email, token: code, type: 'email' }),
+    15000,
+    { error: { message: '__OTP_TIMEOUT__' } }
+  );
+  if(error){
+    err.textContent = (error.message === '__OTP_TIMEOUT__')
+      ? '验证超时，请检查网络后重试喵'
+      : zhErr(error.message);
+    return;
+  }
+  forgotVerified = true;
+  // 进入设置新密码步骤
+  document.getElementById('forgotStep1').style.display = 'none';
+  document.getElementById('forgotStep2').style.display = '';
+  document.getElementById('forgotNewPass').focus();
+  err.classList.add('ok');
+  err.textContent = '✓ 验证通过，请设置新密码喵';
+}
+// 提交新密码（verifyOtp 已建立会话，用 updateUser({password}) 直接改）
+async function submitNewPassword(){
+  const pass = document.getElementById('forgotNewPass').value;
+  const pass2 = document.getElementById('forgotNewPass2').value;
+  const err = document.getElementById('forgotError');
+  const btn = document.querySelector('#forgotStep2 button');
+  err.classList.remove('ok');
+  if(!forgotVerified){ err.textContent='请先完成邮箱验证喵'; return; }
+  if(pass.length < 6){ err.textContent='新密码至少6位喵'; return; }
+  if(pass !== pass2){ err.textContent='两次输入的密码不一致喵'; return; }
+  btn.disabled = true;
+  btn.innerHTML = '修改中…';
+  const { error } = await withTimeout(
+    supabaseClient.auth.updateUser({ password: pass }),
+    15000,
+    { error: { message: '__TIMEOUT__' } }
+  );
+  if(error){
+    btn.disabled = false;
+    btn.innerHTML = '确认修改密码';
+    err.textContent = (error.message === '__TIMEOUT__')
+      ? '操作超时，请检查网络后重试喵'
+      : zhErr(error.message);
+    return;
+  }
+  err.classList.add('ok');
+  err.textContent = '✓ 密码已修改成功，请用新密码登录喵';
+  btn.innerHTML = '修改成功 ✓';
+  setTimeout(()=>{
+    closeModal('forgotModal');
+    btn.disabled = false;
+    btn.innerHTML = '确认修改密码';
+    document.getElementById('forgotStep1').style.display = '';
+    document.getElementById('forgotStep2').style.display = 'none';
+    // 回到登录弹窗并提示
+    document.getElementById('loginModal').classList.add('show');
+    err.classList.remove('ok');
+    err.textContent = '';
+  }, 1200);
 }
 function isTemporaryEmail(email){
   const domain = email.split('@')[1] || '';
