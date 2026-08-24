@@ -8,6 +8,9 @@
 --   2. ensure_profile 遇到"已存在但缺性别/昵称"的 profile 时补齐（仅注册瞬间显式传入时，不覆盖用户后来改的资料）
 --   3. 存量数据一次性补齐：metadata 有性别但 profile 为 '保密' 的补性别；user_xxx 尾巴的补 username/nickname
 -- 执行方式：psycopg2 直连生产库或 Supabase Management API /database/query（curl 文件方式，DDL 用 $$ 包裹）
+-- 备注（2026-08-25 复查）：旧版 4 参数 ensure_profile(uuid,text,text,text) 在生产库存在残留（OID 17666），
+--   已用 DROP FUNCTION IF EXISTS public.ensure_profile(uuid,text,text,text) 清理，现仅剩本文件定义的 5 参数新版（OID 18020）。
+--   前端 3 处 rpc('ensure_profile',{p_id,p_email,p_username,p_nickname,p_gender}) 都按 5 参数调用，命中新版，无歧义。
 
 -- ============================================================
 -- 1. 重写 ensure_profile：支持传入 gender，缺失时从 auth.users 元数据兜底
