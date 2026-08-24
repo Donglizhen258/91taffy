@@ -1611,15 +1611,11 @@ function switchLoginTab(mode){
 // 发送验证码：signInWithOtp(email, shouldCreateUser=true) 发6位数字码
 async function sendRegCode(){
   const email = document.getElementById('regEmail').value.trim();
-  const nick = document.getElementById('regNick').value.trim();
-  const pass = document.getElementById('regPass').value;
   const err = document.getElementById('regError');
   const sendBtn = document.getElementById('regSendBtn');
   err.classList.remove('ok');
   if(!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ err.textContent='请输入正确的邮箱喵'; return; }
   if(isTemporaryEmail(email)){ err.textContent='该邮箱为临时邮箱，暂不支持注册喵'; return; }
-  if(!nick){ err.textContent='请输入昵称喵'; return; }
-  if(pass.length < 6){ err.textContent='密码至少6位喵'; return; }
   if(!supabaseClient){ err.textContent='服务暂不可用，请稍后重试喵'; return; }
   // 先查邮箱是否已被注册，避免给已存在账号发码
   const { data: dup } = await withTimeout(
@@ -1634,8 +1630,7 @@ async function sendRegCode(){
     supabaseClient.auth.signInWithOtp({
       email,
       options:{
-        shouldCreateUser: true,           // 允许创建新用户（注册）
-        data:{ username:nick, nickname:nick, gender:document.getElementById('regGender').value }
+        shouldCreateUser: true           // 允许创建新用户（注册）
       }
     }),
     15000,
@@ -1705,8 +1700,18 @@ async function doRegister(){
       : zhErr(error.message);
     return;
   }
-  // 验证成功：补建 profiles（若触发器未触发），再进入登录态
+  // 验证成功：把昵称/性别写入账号 metadata（发验证码阶段没传，这里补齐），
+  // 再补建 profiles（若触发器未触发），最后进入登录态
   if(data.user){
+    try{
+      await withTimeout(
+        supabaseClient.auth.updateUser({
+          data:{ username:nick, nickname:nick, gender:document.getElementById('regGender').value }
+        }),
+        10000,
+        { data: null, error: { message: '__TIMEOUT__' } }
+      );
+    }catch(e){ /* metadata 写失败不阻断，下面 ensure_profile 兜底 */ }
     try{
       await withTimeout(
         supabaseClient.rpc('ensure_profile', {
