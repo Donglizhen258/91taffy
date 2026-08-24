@@ -1151,6 +1151,8 @@ async function handleRoute(){
       } else {
         switchView('home');
       }
+    } else if(name === 'forum'){
+      switchView('forum');
     } else if(name === 'account'){
       // 未登录也能看账号管理（会显示登录/注册），保持原行为
       switchView('account');
