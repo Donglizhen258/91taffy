@@ -904,7 +904,7 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
   </div>
 </div>
 
-<!-- 注册弹窗 -->
+<!-- 注册弹窗（验证码流程：填邮箱昵称密码 → 发送验证码 → 输6位码 → 校验通过自动登录） -->
 <div class="modal-mask" id="regModal">
   <div class="modal">
     <h3>注册新账号</h3>
@@ -918,6 +918,13 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
         <option value="男">男</option>
         <option value="女">女</option>
       </select>
+    </div>
+    <div class="field" id="regCodeField" style="display:none">
+      <label>邮箱验证码</label>
+      <div style="display:flex;gap:8px">
+        <input id="regCode" type="text" inputmode="numeric" maxlength="6" placeholder="6位数字" style="flex:1;min-width:0">
+        <button class="btn btn-small" id="regSendBtn" style="white-space:nowrap" onclick="sendRegCode()">发送验证码</button>
+      </div>
     </div>
     <button class="btn" id="regBtn" style="width:100%" onclick="doRegister()">注册</button>
     <div class="auth-tip">已有账号？<a onclick="showLogin()">去登录</a></div>
@@ -1517,6 +1524,9 @@ function renderUserBar(){
 }
 
 // ========== 登录/注册 ==========
+// 注册验证码倒计时（防重复发送）
+let regSendTimer = null;
+let regSentEmail = '';   // 记录当前已发送验证码的邮箱
 function showLogin(){
   clearErr();
   document.getElementById('regModal').classList.remove('show');   // 关掉注册弹窗，避免两个弹窗叠着导致登录弹窗不弹出
@@ -1525,6 +1535,12 @@ function showLogin(){
 function showRegister(){
   clearErr();
   document.getElementById('loginModal').classList.remove('show'); // 关掉登录弹窗
+  // 重置验证码流程状态：默认先填基础信息，验证码栏未输入邮箱前不显示
+  document.getElementById('regCodeField').style.display = 'none';
+  document.getElementById('regCode').value = '';
+  document.getElementById('regSendBtn').disabled = false;
+  document.getElementById('regSendBtn').textContent = '发送验证码';
+  if(regSendTimer){ clearInterval(regSendTimer); regSendTimer = null; }
   document.getElementById('regModal').classList.add('show');
 }
 function closeModal(id){ document.getElementById(id).classList.remove('show'); }
@@ -1554,6 +1570,8 @@ function zhErr(msg){
     [/for security purposes|once every \d+ seconds/i, '操作太频繁啦，请稍后再试喵'],
     [/rate limit|too many requests|Requests rate limit/i, '操作太频繁啦，请稍后再试喵'],
     [/network|fetch failed|Failed to fetch|load failed|timeout|timed out|ECONNRESET|ERR_CONNECTION/i, '网络连接失败，请检查网络后重试喵'],
+    [/token.*(invalid|expired)|invalid.*token|expired.*token|code.*invalid|invalid.*code|otp.*expired|expired.*otp|token has expired or is invalid/i, '验证码不正确或已过期，请重新获取喵'],
+    [/too many.*attempt|max.*attempts|attempts exceeded/i, '验证码错误次数过多，请稍后再试或重新获取喵'],
     [/unable to validate|token has expired|JWT|invalid token|refresh token/i, '登录状态已失效，请重新登录喵'],
     [/signup.*disabled|signups.*not allowed|signup.*not allowed/i, '暂未开放注册，请稍后再试喵'],
     [/database error|internal error|server error|PostgrestError|status.?4\d\d/i, '服务器开小差了，请稍后再试喵'],
@@ -1590,11 +1608,74 @@ function switchLoginTab(mode){
   document.getElementById('loginEmailField').style.display = mode === 'email' ? '' : 'none';
   document.getElementById('loginAccountField').style.display = mode === 'account' ? '' : 'none';
 }
+// 发送验证码：signInWithOtp(email, shouldCreateUser=true) 发6位数字码
+async function sendRegCode(){
+  const email = document.getElementById('regEmail').value.trim();
+  const nick = document.getElementById('regNick').value.trim();
+  const pass = document.getElementById('regPass').value;
+  const err = document.getElementById('regError');
+  const sendBtn = document.getElementById('regSendBtn');
+  err.classList.remove('ok');
+  if(!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ err.textContent='请输入正确的邮箱喵'; return; }
+  if(isTemporaryEmail(email)){ err.textContent='该邮箱为临时邮箱，暂不支持注册喵'; return; }
+  if(!nick){ err.textContent='请输入昵称喵'; return; }
+  if(pass.length < 6){ err.textContent='密码至少6位喵'; return; }
+  if(!supabaseClient){ err.textContent='服务暂不可用，请稍后重试喵'; return; }
+  // 先查邮箱是否已被注册，避免给已存在账号发码
+  const { data: dup } = await withTimeout(
+    supabaseClient.from('profiles').select('email').eq('email', email.toLowerCase()).maybeSingle(),
+    10000, { data: null, error: { message: '__TIMEOUT__' } }
+  );
+  if(dup){ err.textContent = '该邮箱已被注册，请直接登录喵'; return; }
+  err.textContent = '';
+  sendBtn.disabled = true;
+  sendBtn.innerHTML = '<span class="spinner"></span>发送中';
+  const { error } = await withTimeout(
+    supabaseClient.auth.signInWithOtp({
+      email,
+      options:{
+        shouldCreateUser: true,           // 允许创建新用户（注册）
+        emailRedirectTo: window.location.origin,
+        data:{ username:nick, nickname:nick, gender:document.getElementById('regGender').value }
+      }
+    }),
+    15000,
+    { error: { message: '__TIMEOUT__' } }
+  );
+  if(error){
+    sendBtn.disabled = false;
+    sendBtn.innerHTML = '发送验证码';
+    err.textContent = (error.message === '__TIMEOUT__')
+      ? '发送超时，请检查网络或代理设置后重试喵'
+      : zhErr(error.message);
+    return;
+  }
+  // 发送成功：显示验证码栏 + 60秒倒计时
+  regSentEmail = email;
+  document.getElementById('regCodeField').style.display = '';
+  document.getElementById('regCode').focus();
+  err.classList.add('ok');
+  err.textContent = '✓ 验证码已发送到邮箱，请查收（10分钟内有效）喵';
+  let left = 60;
+  sendBtn.innerHTML = `重新发送(${left}s)`;
+  if(regSendTimer) clearInterval(regSendTimer);
+  regSendTimer = setInterval(()=>{
+    left--;
+    if(left <= 0){
+      clearInterval(regSendTimer);
+      regSendTimer = null;
+      sendBtn.disabled = false;
+      sendBtn.innerHTML = '重新发送';
+    } else {
+      sendBtn.innerHTML = `重新发送(${left}s)`;
+    }
+  }, 1000);
+}
 async function doRegister(){
   const email = document.getElementById('regEmail').value.trim();
   const nick = document.getElementById('regNick').value.trim();
   const pass = document.getElementById('regPass').value;
-  const gender = document.getElementById('regGender').value;
+  const code = document.getElementById('regCode').value.trim();
   const err = document.getElementById('regError');
   const btn = document.getElementById('regBtn');
   err.classList.remove('ok');
@@ -1602,27 +1683,50 @@ async function doRegister(){
   if(isTemporaryEmail(email)){ err.textContent='该邮箱为临时邮箱，暂不支持注册喵'; return; }
   if(!nick){ err.textContent='请输入昵称喵'; return; }
   if(pass.length < 6){ err.textContent='密码至少6位喵'; return; }
+  // 必须先发验证码，再填码提交
+  if(!regSentEmail || regSentEmail !== email){ err.textContent='请先点击「发送验证码」喵'; return; }
+  if(!/^\d{6}$/.test(code)){ err.textContent='请输入邮箱里收到的6位数字验证码喵'; return; }
   if(!supabaseClient){ err.textContent='服务暂不可用，请稍后重试喵'; return; }
   err.textContent = '';
   setAuthLoading(btn, true, '注册中…');
-  const { data, error } = await supabaseClient.auth.signUp({
-    email, password: pass,
-    options:{ data:{ username:nick, nickname:nick, gender } }
-  });
+  // 6位码校验：verifyOtp(email+token+type=email)，通过即完成邮箱验证并进入登录态
+  const { data, error } = await withTimeout(
+    supabaseClient.auth.verifyOtp({
+      email,
+      token: code,
+      type: 'email'
+    }),
+    15000,
+    { data: null, error: { message: '__OTP_TIMEOUT__' } }
+  );
   if(error){
     setAuthLoading(btn, false);
-    err.textContent = zhErr(error.message);
+    err.textContent = (error.message === '__OTP_TIMEOUT__')
+      ? '验证超时，请检查网络后重试喵'
+      : zhErr(error.message);
     return;
   }
-  if(data.user && data.user.identities && data.user.identities.length === 0){
-    setAuthLoading(btn, false);
-    err.textContent = '该邮箱已被注册，请直接登录喵';
-    return;
+  // 验证成功：补建 profiles（若触发器未触发），再进入登录态
+  if(data.user){
+    try{
+      await withTimeout(
+        supabaseClient.rpc('ensure_profile', {
+          p_id: data.user.id,
+          p_email: data.user.email || email,
+          p_username: nick,
+          p_nickname: nick
+        }),
+        10000,
+        { data: null, error: { message: '__TIMEOUT__' } }
+      );
+    }catch(e){ /* 补建失败不阻断，下面统一拉取资料 */ }
   }
+  // 走与登录一致的成功收尾：拉资料、更新界面、关弹窗
   err.classList.add('ok');
-  err.textContent = '✓ 注册成功！请到邮箱查收验证邮件，点击验证链接后即可登录喵';
+  err.textContent = '✓ 注册成功！正在进入…';
   btn.innerHTML = '注册成功 ✓';
   btn.disabled = true;
+  await finalizeAuth(data.user);
   setTimeout(()=>{
     closeModal('regModal');
     btn.disabled = false;
@@ -1630,7 +1734,7 @@ async function doRegister(){
     delete btn.dataset.orig;
     err.classList.remove('ok');
     err.textContent = '';
-  }, 2000);
+  }, 800);
 }
 async function doLogin(){
   const err = document.getElementById('loginError');
@@ -1752,20 +1856,7 @@ async function tryLogin(cred, btn, err, byAccount){
   err.textContent = '✓ 登录成功！';
   btn.innerHTML = '登录成功 ✓';
   btn.disabled = true;
-  renderUserBar();
-  // 登录成功：显示「账号管理」菜单
-  const navAcc = document.getElementById('navAccount');
-  if(navAcc) navAcc.style.display = '';
-  // 根据角色决定「网站管理」菜单的可见性
-  const navAdmin = document.getElementById('navAdmin');
-  if(currentProfile && ['owner','admin'].includes(currentProfile.role)){
-    if(navAdmin) navAdmin.style.display = '';
-    // 管理面板后台异步刷新，不阻塞登录成功反馈与弹窗关闭
-    renderAdminPanel();
-  } else {
-    if(navAdmin) navAdmin.style.display = 'none';
-  }
-  setCommentLocked(false); // 登录成功，解锁评论区
+  await finalizeAuth(data.user);
   // 立即关弹窗给反馈（不再等 600ms），评论列表后台刷新
   closeModal('loginModal');
   btn.disabled = false;
@@ -1774,6 +1865,29 @@ async function tryLogin(cred, btn, err, byAccount){
   setTimeout(()=>{ err.classList.remove('ok'); err.textContent = ''; }, 1200);
   if(ACTIVE === 'profile' && viewingUserId){
     await loadProfile(viewingUserId); // 资料页登录：刷新资料与封禁区
+  } else {
+    await loadComments(true);
+  }
+}
+// 登录/注册成功后的统一界面收尾（注册验证码流程复用）：渲染用户栏/菜单/解锁评论/刷新列表
+async function finalizeAuth(user){
+  currentUser = user || currentUser;
+  renderUserBar();
+  // 显示「账号管理」菜单
+  const navAcc = document.getElementById('navAccount');
+  if(navAcc) navAcc.style.display = '';
+  // 根据角色决定「网站管理」菜单的可见性
+  const navAdmin = document.getElementById('navAdmin');
+  if(currentProfile && ['owner','admin'].includes(currentProfile.role)){
+    if(navAdmin) navAdmin.style.display = '';
+    renderAdminPanel(); // 后台异步刷新，不阻塞
+  } else {
+    if(navAdmin) navAdmin.style.display = 'none';
+  }
+  setCommentLocked(false); // 解锁评论区
+  // 若资料页在浏览，刷新当前资料
+  if(ACTIVE === 'profile' && viewingUserId){
+    await loadProfile(viewingUserId);
   } else {
     await loadComments(true);
   }
