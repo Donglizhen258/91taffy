@@ -1481,7 +1481,8 @@ async function loadSession(){
             p_id: user.id,
             p_email: user.email || '',
             p_username: meta.username || null,
-            p_nickname: meta.nickname || null
+            p_nickname: meta.nickname || null,
+            p_gender: meta.gender || null
           });
           const { data: prof2 } = await supabaseClient.from('profiles').select('*').eq('id', user.id).maybeSingle();
           prof = prof2;
@@ -1943,7 +1944,8 @@ async function doRegister(){
           p_id: data.user.id,
           p_email: data.user.email || email,
           p_username: nick,
-          p_nickname: nick
+          p_nickname: nick,
+          p_gender: document.getElementById('regGender').value
         }),
         10000,
         { data: null, error: { message: '__TIMEOUT__' } }
@@ -2044,7 +2046,8 @@ async function tryLogin(cred, btn, err, byAccount){
           p_id: data.user.id,
           p_email: data.user.email || '',
           p_username: meta.username || null,
-          p_nickname: meta.nickname || null
+          p_nickname: meta.nickname || null,
+          p_gender: meta.gender || null
         }),
         10000,
         { data: null, error: { message: '__TIMEOUT__' } }
