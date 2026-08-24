@@ -1552,6 +1552,13 @@ async function loadSession(){
 function renderUserBar(){
   const p = currentProfile;
   const info = document.getElementById('userInfo');
+  if(!p){
+    // 兜底：资料尚未加载（如注册后查询超时/偶发失败）时不崩溃，显示占位保持可退出
+    info.textContent = '已登录';
+    document.getElementById('userActions').innerHTML =
+      `<button class="btn btn-ghost btn-small" onclick="doLogout()">退出</button>`;
+    return;
+  }
   const roleClass = p.role === 'owner' ? 'role-owner' : p.role === 'admin' ? 'role-admin' : 'role-user';
   const roleText = p.role === 'owner' ? '站长' : p.role === 'admin' ? '管理员' : '用户';
   info.innerHTML = `你好，<b>${escapeHtml(p.nickname || p.username)}</b> <span class="uid-badge">UID ${p.uid}</span> <span class="role-badge ${roleClass}">${roleText}</span>${p.gender ? ' · '+p.gender : ''}`;
@@ -1580,6 +1587,7 @@ function showRegister(){
   document.getElementById('regSendBtn').disabled = false;
   document.getElementById('regSendBtn').textContent = '发送验证码';
   if(regSendTimer){ clearInterval(regSendTimer); regSendTimer = null; }
+  regSentEmail = '';   // 重置已发送邮箱：避免上次发码的邮箱残留，导致下次填同邮箱时跳过发码直接提交
   document.getElementById('regModal').classList.add('show');
 }
 function closeModal(id){ document.getElementById(id).classList.remove('show'); }
@@ -1669,6 +1677,16 @@ async function sendForgotCode(){
   err.classList.remove('ok');
   if(!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ err.textContent='请输入正确的邮箱喵'; return; }
   if(!supabaseClient){ err.textContent='服务暂不可用，请稍后重试喵'; return; }
+  // 先确认该邮箱是已注册账号，避免对不存在的邮箱发码造成困惑（找回密码只服务已有账号）
+  const { data: existing } = await withTimeout(
+    supabaseClient.from('profiles').select('email').eq('email', email.toLowerCase()).maybeSingle(),
+    10000,
+    { data: null, error: { message: '__TIMEOUT__' } }
+  );
+  if(!existing){
+    err.textContent = '该邮箱未注册，请检查是否输错，或直接注册新账号喵';
+    return;
+  }
   sendBtn.disabled = true;
   sendBtn.innerHTML = '<span class="spinner"></span>发送中';
   const { error } = await withTimeout(
@@ -1762,6 +1780,9 @@ async function submitNewPassword(){
   err.classList.add('ok');
   err.textContent = '✓ 密码已修改成功，请用新密码登录喵';
   btn.innerHTML = '修改成功 ✓';
+  // 主动登出：verifyOtp 建立的旧会话 token 在改密后仍有效，清掉避免残留登录态，强制用新密码重登
+  try{ await supabaseClient.auth.signOut(); }catch(e){}
+  currentUser = null; currentProfile = null;
   setTimeout(()=>{
     closeModal('forgotModal');
     btn.disabled = false;
@@ -1951,6 +1972,16 @@ async function doRegister(){
         { data: null, error: { message: '__TIMEOUT__' } }
       );
     }catch(e){ /* 补建失败不阻断，下面统一拉取资料 */ }
+    // 注册成功：重新拉取 profile 并更新 currentProfile，
+    // 确保 renderUserBar / finalizeAuth 拿到的是含昵称/性别的最新资料（否则 currentProfile 为 null 会崩，或显示旧资料）
+    try{
+      const { data: fresh } = await withTimeout(
+        supabaseClient.from('profiles').select('*').eq('id', data.user.id).maybeSingle(),
+        10000,
+        { data: null, error: { message: '__TIMEOUT__' } }
+      );
+      if(fresh) currentProfile = fresh;
+    }catch(e){ /* 拉取失败不阻断，finalizeAuth 兜底 */ }
   }
   // 走与登录一致的成功收尾：拉资料、更新界面、关弹窗
   err.classList.add('ok');
