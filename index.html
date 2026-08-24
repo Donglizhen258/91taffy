@@ -841,8 +841,9 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
           <input type="number" id="postLotteryMax" min="1" max="1000" value="10" style="padding:6px 8px;border:1px solid rgba(178,58,99,.4);border-radius:4px;font-size:13px;color:var(--ink-900);background:#fff">
         </div>
         <div class="post-field" id="postLotteryDeadlineRow" style="margin-bottom:8px">
-          <label>参与截止时间（到点自动开奖）</label>
+          <label>截止时间（可选）</label>
           <input type="datetime-local" id="postLotteryDeadline" style="padding:6px 8px;border:1px solid rgba(178,58,99,.4);border-radius:4px;font-size:13px;color:var(--ink-900);background:#fff">
+          <div style="font-size:11px;color:var(--ink-400);margin-top:4px" id="postLotteryDeadlineTip">定时开奖：到点自动开奖，也可手动开奖喵。</div>
         </div>
         <div style="font-size:12px;color:var(--ink-400);margin-bottom:8px" id="postLotteryHint">
           即时开奖：参与者点「立即抽」当场出结果，抽中即得奖，名额抽完自动结束喵。
@@ -3234,6 +3235,10 @@ function renderLotteryCard(p){
   if(isDrawing && !isInstant && canDraw){
     drawBtn = `<button class="btn btn-ok btn-small" onclick="drawMyLottery()">🎲 ${expired ? '立即开奖' : '手动开奖'}</button>`;
   }
+  // 即时模式：管理员/楼主可提前结束（未抽完的名额轮空）
+  if(isDrawing && isInstant && canDraw){
+    drawBtn += `<button class="btn btn-ok btn-small" onclick="finishMyInstantLottery()">🏁 ${expired ? '结束抽奖' : '提前结束'}</button>`;
+  }
 
   // 我的中奖卡（实体/虚拟都需先填具体信息/联系方式领取；虚拟奖品领取后展示兑换码）
   let myCard = '';
@@ -3439,6 +3444,18 @@ async function drawMyLottery(){
   await refreshLotteryData();
   renderForumPost();
 }
+// 提前结束即时抽奖（未抽完的名额轮空，已中奖者保留）
+async function finishMyInstantLottery(){
+  if(!currentUser || !currentForumPost) return;
+  const prizes = Array.isArray(currentLottery && currentLottery.prizes) ? currentLottery.prizes : [];
+  const total = prizes.reduce((s, p) => s + (p.count || 0), 0);
+  if(!confirm(`确定结束这个即时抽奖吗喵？已抽中的${currentLottery ? '保留' : ''}，未抽完的名额将作废（奖品共 ${total} 个名额）。结束不可撤销喵！`)) return;
+  const { error } = await supabaseClient.rpc('finish_lottery_instant', { p_post_id: currentForumPost.id });
+  if(error){ alert(zhErr(error.message)); return; }
+  alert('抽奖已结束喵！🎉');
+  await refreshLotteryData();
+  renderForumPost();
+}
 // 领取奖品（虚拟直接领 / 实体需填联系方式）
 async function claimMyLottery(){
   if(!currentUser || !currentForumPost) return;
@@ -3601,8 +3618,10 @@ function showPostModal(){
   document.getElementById('postLotteryDeadline').value = '';
   document.getElementById('postLotteryClaimNote').value = '';
   document.getElementById('postLotteryMaxRow').style.display = '';
-  document.getElementById('postLotteryDeadlineRow').style.display = 'none';
+  document.getElementById('postLotteryDeadlineRow').style.display = '';
   document.getElementById('postLotteryHint').textContent = '即时开奖：参与者点「立即抽」当场出结果，抽中即得奖，名额抽完自动结束喵。';
+  const dlTip = document.getElementById('postLotteryDeadlineTip');
+  if(dlTip) dlTip.textContent = '即时开奖：可选，到截止时间未抽完的名额作废（已中奖的不受影响）喵。';
   document.getElementById('lotteryPrizeList').innerHTML = '';
   forumLotteryPrizeRows = 0;
   addLotteryPrize(); // 默认一个空奖项行
@@ -3631,18 +3650,21 @@ function onPostLotteryToggle(){
 function onLotteryModeChange(){
   const mode = document.getElementById('postLotteryMode').value;
   document.getElementById('postLotteryMaxRow').style.display = mode === 'instant' ? '' : 'none';
-  document.getElementById('postLotteryDeadlineRow').style.display = mode === 'scheduled' ? '' : 'none';
+  // 两种模式都支持截止时间（可选）：定时=到点自动开奖；即时=到期名额轮空
+  document.getElementById('postLotteryDeadlineRow').style.display = '';
+  const dlTip = document.getElementById('postLotteryDeadlineTip');
+  if(dlTip) dlTip.textContent = mode === 'instant'
+    ? '即时开奖：可选，到截止时间未抽完的名额作废（已中奖的不受影响）喵。'
+    : '定时开奖：到点自动开奖，也可手动开奖喵。';
   document.getElementById('postLotteryHint').textContent = mode === 'instant'
     ? '即时开奖：参与者点「立即抽」当场出结果，抽中即得奖，名额抽完自动结束喵。'
     : '定时开奖：参与者先「参与抽奖」，到截止时间系统自动开奖，也可由你手动开奖喵。';
-  // 定时模式：默认预填 24 小时后，方便直接用
-  if(mode === 'scheduled'){
-    const d = document.getElementById('postLotteryDeadline');
-    if(d && !d.value){
-      const t = new Date(Date.now() + 24*3600*1000);
-      const pad = n => String(n).padStart(2,'0');
-      d.value = `${t.getFullYear()}-${pad(t.getMonth()+1)}-${pad(t.getDate())}T${pad(t.getHours())}:${pad(t.getMinutes())}`;
-    }
+  // 截止时间默认预填 24 小时后（若为空）
+  const d = document.getElementById('postLotteryDeadline');
+  if(d && !d.value){
+    const t = new Date(Date.now() + 24*3600*1000);
+    const pad = n => String(n).padStart(2,'0');
+    d.value = `${t.getFullYear()}-${pad(t.getMonth()+1)}-${pad(t.getDate())}T${pad(t.getHours())}:${pad(t.getMinutes())}`;
   }
 }
 // 抽奖奖项行（动态增删）
@@ -3765,6 +3787,14 @@ async function submitPost(){
         const dv = document.getElementById('postLotteryDeadline').value;
         if(dv) deadline = new Date(dv).toISOString();
         else { err.textContent = '定时开奖需要设置截止时间喵'; btn.disabled = false; btn.innerHTML = '发布'; return; }
+      }
+      if(mode === 'instant'){
+        // 即时模式：截止时间可选（有则传，无则 null=只限人数）
+        const dv = document.getElementById('postLotteryDeadline').value;
+        if(dv){
+          const dl = new Date(dv);
+          if(!isNaN(dl.getTime())) deadline = dl.toISOString();
+        }
       }
       const claimNote = document.getElementById('postLotteryClaimNote').value.trim();
       let prizes;
