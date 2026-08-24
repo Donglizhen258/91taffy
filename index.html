@@ -2888,27 +2888,37 @@ async function loadAnnouncement(){
   const card = document.getElementById('homeNoticeCard');
   if(!card) return;
   try{
+    // 拉全部公告帖（按时间倒序），手动设了栏位的用指定栏位，空栏位用最新公告自动填充兜底
     const { data, error } = await supabaseClient
       .from('forum_posts')
       .select('id,title,content,author_id,created_at,notice_slot,author:profiles!forum_posts_author_id_fkey(nickname,username)')
       .eq('post_type', 'notice')
-      .not('notice_slot', 'is', null)
-      .order('notice_slot', { ascending:true });
+      .order('created_at', { ascending:false });
     if(error || !data || !data.length){
       card.style.display = 'none';
       noticeSlotPosts = { 1: null, 2: null, 3: null };
       return;
     }
-    // 重置
+    // 先放手动指定栏位的公告
     noticeSlotPosts = { 1: null, 2: null, 3: null };
-    let anyVisible = false;
+    const unassigned = [];
     data.forEach(n => {
       const slot = n.notice_slot;
-      if(slot >= 1 && slot <= 3){
+      if(slot >= 1 && slot <= 3 && !noticeSlotPosts[slot]){
         noticeSlotPosts[slot] = n;
+      } else {
+        unassigned.push(n);
       }
     });
+    // 空栏位用未指定栏位的公告按时间倒序自动填充（兜底，保证公告栏始终有内容）
+    let ui = 0;
+    for(let i = 1; i <= 3; i++){
+      if(!noticeSlotPosts[i] && ui < unassigned.length){
+        noticeSlotPosts[i] = unassigned[ui++];
+      }
+    }
     // 渲染三个栏位
+    let anyVisible = false;
     for(let i = 1; i <= 3; i++){
       const slotEl = document.getElementById('homeNoticeSlot' + i);
       const n = noticeSlotPosts[i];
