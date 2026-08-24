@@ -2888,37 +2888,27 @@ async function loadAnnouncement(){
   const card = document.getElementById('homeNoticeCard');
   if(!card) return;
   try{
-    // 拉全部公告帖（按时间倒序），手动设了栏位的用指定栏位，空栏位用最新公告自动填充兜底
     const { data, error } = await supabaseClient
       .from('forum_posts')
       .select('id,title,content,author_id,created_at,notice_slot,author:profiles!forum_posts_author_id_fkey(nickname,username)')
       .eq('post_type', 'notice')
-      .order('created_at', { ascending:false });
+      .not('notice_slot', 'is', null)
+      .order('notice_slot', { ascending:true });
     if(error || !data || !data.length){
       card.style.display = 'none';
       noticeSlotPosts = { 1: null, 2: null, 3: null };
       return;
     }
-    // 先放手动指定栏位的公告
+    // 重置
     noticeSlotPosts = { 1: null, 2: null, 3: null };
-    const unassigned = [];
+    let anyVisible = false;
     data.forEach(n => {
       const slot = n.notice_slot;
-      if(slot >= 1 && slot <= 3 && !noticeSlotPosts[slot]){
+      if(slot >= 1 && slot <= 3){
         noticeSlotPosts[slot] = n;
-      } else {
-        unassigned.push(n);
       }
     });
-    // 空栏位用未指定栏位的公告按时间倒序自动填充（兜底，保证公告栏始终有内容）
-    let ui = 0;
-    for(let i = 1; i <= 3; i++){
-      if(!noticeSlotPosts[i] && ui < unassigned.length){
-        noticeSlotPosts[i] = unassigned[ui++];
-      }
-    }
     // 渲染三个栏位
-    let anyVisible = false;
     for(let i = 1; i <= 3; i++){
       const slotEl = document.getElementById('homeNoticeSlot' + i);
       const n = noticeSlotPosts[i];
@@ -3501,6 +3491,7 @@ function renderLotteryCard(p){
       ${actionHtml}
       ${isLtManager && currentLotteryPrizeStatus.length ? `<button class="btn btn-ghost btn-small" onclick="toggleLotteryPrizeStatus()">🎁 奖品明细</button>` : ''}
       ${isLtManager ? `<button class="btn btn-ghost btn-small" onclick="toggleLotteryParticipants()">👥 参与者名单</button>` : ''}
+      ${(isLtManager && isDrawing) ? `<button class="btn btn-ghost btn-small" onclick="editLotteryDeadline()">⏰ 改截止时间</button>` : ''}
       ${drawBtn}
     </div>
     ${myCard}
@@ -3609,6 +3600,38 @@ async function claimMyLottery(){
   });
   if(error){ alert(zhErr(error.message)); return; }
   alert(myWin.prize_type === 'physical' ? '领取成功喵！🎉' : '领取成功，兑换码已展示喵！🎉');
+  await refreshLotteryData();
+  renderForumPost();
+}
+// 修改抽奖截止时间（仅 楼主/站长/管理员，进行中可改）
+async function editLotteryDeadline(){
+  if(!currentUser || !currentForumPost || !currentLottery) return;
+  const isInstant = currentLottery.draw_mode === 'instant';
+  const curDeadline = currentLottery.deadline;
+  // 把当前截止时间转成 datetime-local 可用的本地时间字符串
+  let defVal = '';
+  if(curDeadline){
+    const d = new Date(curDeadline);
+    const pad = n => String(n).padStart(2,'0');
+    defVal = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+  const hint = isInstant
+    ? '即时开奖的截止时间可选：填了到点未抽完名额作废；留空则不限时（只限人数）。\n\n输入新截止时间，留空 = 取消截止：'
+    : '定时开奖到点自动开奖。输入新的截止时间（必须晚于当前时间）：';
+  const val = prompt(hint, defVal);
+  if(val === null) return; // 用户取消
+  const trimmed = val.trim();
+  let deadline = null;
+  if(trimmed !== ''){
+    const d = new Date(trimmed);
+    if(isNaN(d.getTime())){ alert('时间格式不对喵，请用「年-月-日 时:分」的格式喵'); return; }
+    deadline = d.toISOString();
+  }
+  const { error } = await supabaseClient.rpc('update_lottery_deadline', {
+    p_post_id: currentForumPost.id, p_deadline: deadline
+  });
+  if(error){ alert(zhErr(error.message)); return; }
+  alert('截止时间已更新喵！');
   await refreshLotteryData();
   renderForumPost();
 }
