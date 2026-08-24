@@ -1550,15 +1550,15 @@ function zhErr(msg){
     [/already been registered|already registered|User already registered|Email already exists/i, '该邮箱已被注册，请直接登录喵'],
     [/password.*(too short|should be at least)|at least \d+ characters|Password should be/i, '密码太短啦，至少需要6位喵'],
     [/user already exists|User already exists/i, '该用户已存在，请直接登录喵'],
+    [/over_email_send_rate_limit|email rate limit|too many email|over email send/i, '验证邮件发送太频繁啦，请稍后再试喵'],
+    [/for security purposes|once every \d+ seconds/i, '操作太频繁啦，请稍后再试喵'],
     [/rate limit|too many requests|Requests rate limit/i, '操作太频繁啦，请稍后再试喵'],
     [/network|fetch failed|Failed to fetch|load failed|timeout|timed out|ECONNRESET|ERR_CONNECTION/i, '网络连接失败，请检查网络后重试喵'],
     [/unable to validate|token has expired|JWT|invalid token|refresh token/i, '登录状态已失效，请重新登录喵'],
-    [/for security purposes|signup.*disabled|signups.*not allowed/i, '暂未开放注册，请稍后再试喵'],
+    [/signup.*disabled|signups.*not allowed|signup.*not allowed/i, '暂未开放注册，请稍后再试喵'],
     [/database error|internal error|server error|PostgrestError|status.?4\d\d/i, '服务器开小差了，请稍后再试喵'],
-    [/too many email/i, '验证邮件发送太频繁啦，请稍后再试喵'],
     [/new password should be different|password.*same/i, '新密码不能和旧密码一样喵'],
-    [/reauthentication|re-auth|recent login/i, '为了安全，请重新登录后再试喵'],
-    [/over email send rate limit/i, '邮件发送太频繁啦，请稍后再试喵']
+    [/reauthentication|re-auth|recent login/i, '为了安全，请重新登录后再试喵']
   ];
   for(const [re, zh] of map){
     if(re.test(m)) return zh;
