@@ -43,10 +43,11 @@ begin
 
   select role into v_role from public.profiles where id = v_uid;
   select author_id into v_post_author from public.forum_posts where id = p_post_id;
-  v_is_manager := (v_role in ('owner','admin')) or (v_post_author is not null and v_post_author = v_uid);
+  -- 仅站长(owner) 或 发帖人(楼主) 可查看，管理员 admin 也不得查看（防徇私舞弊）
+  v_is_manager := (v_role = 'owner') or (v_post_author is not null and v_post_author = v_uid);
 
   if not v_is_manager then
-    raise exception '只有发起人或站长/管理员能查看奖品分配明细喵';
+    raise exception '只有发起人或站长能查看奖品分配明细喵';
   end if;
 
   select prizes into v_prizes from public.forum_lotteries where post_id = p_post_id;

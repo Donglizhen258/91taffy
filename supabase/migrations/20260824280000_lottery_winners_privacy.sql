@@ -53,7 +53,8 @@ begin
   if v_uid is not null then
     select role into v_role from public.profiles where id = v_uid;
     select author_id into v_post_author from public.forum_posts where id = p_post_id;
-    v_is_manager := (v_role in ('owner','admin')) or (v_post_author is not null and v_post_author = v_uid);
+    -- 仅站长(owner) 或 发帖人(楼主) 可看完整名单(含 code/contact)，管理员 admin 也不得看（防徇私舞弊）
+    v_is_manager := (v_role = 'owner') or (v_post_author is not null and v_post_author = v_uid);
   end if;
 
   if v_is_manager then

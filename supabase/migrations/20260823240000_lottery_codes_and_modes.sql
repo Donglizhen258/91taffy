@@ -124,8 +124,9 @@ begin
     raise exception '这不是一个抽奖帖喵';
   end if;
   select author_id into v_post_author from public.forum_posts where id = p_post_id;
-  if v_role not in ('owner','admin') and (v_post_author is null or v_post_author <> v_uid) then
-    raise exception '只有发起人或站长/管理员能开奖喵';
+  -- 仅站长(owner) 或 发帖人(楼主) 可开奖，管理员 admin 也不得操作（防徇私舞弊）
+  if v_role <> 'owner' and (v_post_author is null or v_post_author <> v_uid) then
+    raise exception '只有发起人或站长能开奖喵';
   end if;
   perform public._lottery_draw_core(p_post_id);
 end;

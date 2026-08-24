@@ -189,8 +189,9 @@ begin
   end if;
   select role into v_role from public.profiles where id = v_uid;
   select author_id into v_post_author from public.forum_posts where id = p_post_id;
-  if v_role not in ('owner','admin') and (v_post_author is null or v_post_author <> v_uid) then
-    raise exception '只有发起人或站长/管理员能查看参与者名单喵';
+  -- 仅站长(owner) 或 发帖人(楼主) 可查看，管理员 admin 也不得查看（防徇私舞弊）
+  if v_role <> 'owner' and (v_post_author is null or v_post_author <> v_uid) then
+    raise exception '只有发起人或站长能查看参与者名单喵';
   end if;
   select count(*) into v_total
     from public.forum_lottery_entries where post_id = p_post_id;
@@ -255,8 +256,9 @@ begin
   end if;
   select role into v_role from public.profiles where id = v_uid;
   select author_id into v_post_author from public.forum_posts where id = p_post_id;
-  if v_role not in ('owner','admin') and (v_post_author is null or v_post_author <> v_uid) then
-    raise exception '只有发起人或站长/管理员能管理参与者喵';
+  -- 仅站长(owner) 或 发帖人(楼主) 可管理，管理员 admin 也不得操作（防徇私舞弊）
+  if v_role <> 'owner' and (v_post_author is null or v_post_author <> v_uid) then
+    raise exception '只有发起人或站长能管理参与者喵';
   end if;
   select status into v_status from public.forum_lotteries where post_id = p_post_id;
   if v_status <> 'drawing' then

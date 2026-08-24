@@ -342,8 +342,8 @@ begin
   end if;
   select role into v_role from public.profiles where id = v_uid;
   select author_id into v_post_author from public.forum_posts where id = p_post_id;
-  if v_role not in ('owner','admin') and (v_post_author is null or v_post_author <> v_uid) then
-    raise exception '只有发起人或站长/管理员能结束抽奖喵';
+  if v_role <> 'owner' and (v_post_author is null or v_post_author <> v_uid) then
+    raise exception '只有发起人或站长能结束抽奖喵';
   end if;
   select status, draw_mode into v_status, v_draw_mode
     from public.forum_lotteries where post_id = p_post_id;
@@ -438,8 +438,8 @@ begin
   end if;
   select role into v_role from public.profiles where id = v_uid;
   select author_id into v_post_author from public.forum_posts where id = p_post_id;
-  if v_role not in ('owner','admin') and (v_post_author is null or v_post_author <> v_uid) then
-    raise exception '只有发起人或站长/管理员能管理参与者喵';
+  if v_role <> 'owner' and (v_post_author is null or v_post_author <> v_uid) then
+    raise exception '只有发起人或站长能管理参与者喵';
   end if;
   select status into v_status from public.forum_lotteries where post_id = p_post_id;
   if v_status <> 'drawing' then

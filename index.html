@@ -3066,7 +3066,7 @@ async function openForumPost(id){
   currentLotteryBans = [];
   currentLotteryPrizeStatus = [];
   const isLtManager = currentUser && currentProfile && (
-    ['owner','admin'].includes(currentProfile.role) || data.author_id === currentUser.id
+    currentProfile.role === 'owner' || data.author_id === currentUser.id
   );
   try{
     const [lg, en, wn, dis, bans, pstatus] = await Promise.all([
@@ -3261,14 +3261,16 @@ function renderLotteryCard(p){
   const isDrawing = lt.status === 'drawing';
   const now = Date.now();
   const expired = lt.deadline && new Date(lt.deadline).getTime() < now;
-  const isOwnerAdmin = currentProfile && ['owner','admin'].includes(currentProfile.role);
-  const canDraw = isOwnerAdmin || (currentUser && p.author_id === currentUser.id);
+  // 抽奖管理权限：仅站长(owner) 或 发帖人(楼主)；管理员 admin 也不得查看/改动抽奖设置，防徇私舞弊
+  const isOwner = currentProfile && currentProfile.role === 'owner';
+  const canManageLottery = isOwner || (currentUser && p.author_id === currentUser.id);
+  const canDraw = canManageLottery;
   const isInstant = lt.draw_mode === 'instant';
   // 参与者数量（即时/定时统一用 entry_count，后端已同步维护；兜底用 entries 长度）
   const entryCount = lt.entry_count != null ? lt.entry_count : currentLotteryEntries.length;
   const maxEntries = lt.max_entries;
   const bannedCount = lt.banned_count || 0;
-  const isLtManager = isOwnerAdmin || (currentUser && p.author_id === currentUser.id);
+  const isLtManager = canManageLottery;
   // 当前用户是否已参与/已抽
   const myEntry = currentUser && currentLotteryEntries.some(e => e.user_id === currentUser.id);
   const myWin = currentUser && currentLotteryWinners.find(w => w.user_id === currentUser.id);
@@ -3372,8 +3374,8 @@ function renderLotteryCard(p){
           const claimedText = w.claimed
             ? `<span class="lw-claimed">✓ 已领取</span>`
             : `<span class="lw-status">未领取${w.prize_type==='physical' ? ' · 待填联系方式' : ''}</span>`;
-          // 联系方式仅管理层可见（普通用户 RPC 不返回）
-          const contact = (isOwnerAdmin || (currentUser && p.author_id === currentUser.id)) && w.contact
+          // 联系方式仅站长/发帖人可见（普通用户和管理员 RPC 均不返回，防徇私）
+          const contact = canManageLottery && w.contact
             ? `<span class="lw-contact">📞 ${escapeHtml(w.contact)}</span>` : '';
           return `<div class="lottery-winner-item">
             <img src="${avatar}" onerror="this.onerror=null;this.src='${DEFAULT_AVATAR}'">
@@ -3667,7 +3669,7 @@ async function refreshLotteryData(){
   if(!currentForumPost) return;
   const id = currentForumPost.id;
   const isLtManager = currentUser && currentProfile && (
-    ['owner','admin'].includes(currentProfile.role) || currentForumPost.author_id === currentUser.id
+    currentProfile.role === 'owner' || currentForumPost.author_id === currentUser.id
   );
   try{
     const [lg, en, wn, dis, bans, pstatus] = await Promise.all([

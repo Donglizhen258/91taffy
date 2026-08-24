@@ -29,8 +29,9 @@ begin
   end if;
   select role into v_role from public.profiles where id = v_uid;
   select author_id into v_post_author from public.forum_posts where id = p_post_id;
-  if v_role not in ('owner','admin') and (v_post_author is null or v_post_author <> v_uid) then
-    raise exception '只有发起人或站长/管理员能修改截止时间喵';
+  -- 仅站长(owner) 或 发帖人(楼主) 可改，管理员 admin 也不得改动（防徇私舞弊）
+  if v_role <> 'owner' and (v_post_author is null or v_post_author <> v_uid) then
+    raise exception '只有发起人或站长能修改截止时间喵';
   end if;
   select status, draw_mode into v_status, v_draw_mode
     from public.forum_lotteries where post_id = p_post_id;
