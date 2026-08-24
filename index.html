@@ -2258,6 +2258,7 @@ let allReplies = [];        // 当前页所有二级评论（时间正序）
 let likedSet = new Set();   // 当前用户点赞过的评论 id（comment_id 全局唯一，首页/资料页共享）
 let currentPage = 1;        // 当前评论页码
 let totalPages = 1;         // 评论总页数
+let commentTotal = 0;       // 一级评论总数（数据库精确计数，用于分页）
 
 // ===== 资料详情页评论状态（与首页评论独立） =====
 let ACTIVE = 'home';        // 当前显示的评论区：home / profile
@@ -2269,6 +2270,7 @@ let pAllComments = [];
 let pAllReplies = [];
 let pCurrentPage = 1;
 let pTotalPages = 1;
+let pCommentTotal = 0;       // 资料页一级评论总数（数据库精确计数，用于分页）
 let pPhotoFile = null;
 let pEmojiRendered = false;
 let viewingUid = null;      // 正在查看资料的用户 uid
@@ -2280,10 +2282,14 @@ function fmtTime(iso){
   return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 }
 function setSort(mode){
+  if(mode === sortMode) return; // 重复点击同排序忽略
   sortMode = mode;
   currentPage = 1; // 切换排序回到第一页
   document.querySelectorAll('.sort-btn').forEach(b => b.classList.toggle('active', b.dataset.sort === mode));
-  renderCommentList();
+  // 排序变化统一重新从数据库拉取第 1 页：
+  //   时间排序 = 数据库分页（一页数据按方向排序，复用会错乱）
+  //   点赞排序 = 全量拉取（内存里必须持有全量才能前端排序切片）
+  loadComments(false);
 }
 function startReply(id){
   if(!currentUser){ alert('请先登录喵'); return; }
@@ -2389,6 +2395,8 @@ async function submitComment(){
     cancelReply();
     setCommentBtnLoading(btn, false);
     setCommentStatus('commentStatus', '✓ 评论发布成功喵', 'ok');
+    // 发新评论后跳回第 1 页，确保能看到自己的评论（最新排序在第1页顶部，最早排序跳到第1页也合理）
+    currentPage = 1;
     await loadComments(false);
     setTimeout(()=>{ setCommentStatus('commentStatus', '', ''); }, 2600);
   }catch(err){
@@ -2403,32 +2411,83 @@ async function loadComments(reset){
     document.getElementById('commentList').innerHTML = `<div class="empty">评论服务暂不可用，请稍后刷新喵</div>`;
     return;
   }
-  // 1. 一级评论（时间正序，用于定楼层）
-  const { data: firsts, error: e1 } = await supabaseClient
-    .from('comments')
-    .select('*, author_uid, author:profiles!comments_author_id_fkey(id,nickname,username,uid,role,avatar_url)')
-    .eq('page_id', PAGE_ID)
-    .is('parent_id', null)
-    .order('created_at', { ascending:true });
-  if(e1){ document.getElementById('commentList').innerHTML = `<div class="empty">加载失败：${zhErr(e1.message)}</div>`; return; }
-  // 2. 二级评论（时间正序）
-  const { data: replies, error: e2 } = await supabaseClient
-    .from('comments')
-    .select('*, author_uid, author:profiles!comments_author_id_fkey(id,nickname,username,uid,role,avatar_url)')
-    .eq('page_id', PAGE_ID)
-    .not('parent_id', 'is', null)
-    .order('created_at', { ascending:true });
-  allComments = firsts || [];
-  allReplies = replies || [];  // e2 出错时 replies 为 undefined，用空数组兜底
-  // 3. 当前用户点赞集合
-  likedSet = new Set();
-  if(currentUser){
-    const { data: likes } = await supabaseClient
-      .from('comment_likes').select('comment_id').eq('user_id', currentUser.id);
-    likedSet = new Set((likes || []).map(l => l.comment_id));
+  // 楼层概念绑定时间正序：最新(time_desc)/最早(time_asc)都走数据库分页，楼层绝对连贯
+  // 楼层计算：正序=(页-1)*页大小+序号+1；倒序=总数-(页-1)*页大小-序号（倒序第i条=正序倒数第i条）
+  // 点赞排序(likes_*)因需聚合，回退全量前端排序（数据量大时可后续用 RPC 实现）
+  const useDbPaging = (sortMode === 'time_asc' || sortMode === 'time_desc');
+  const commentSelect = '*, author_uid, author:profiles!comments_author_id_fkey(id,nickname,username,uid,role,avatar_url)';
+  try{
+    if(useDbPaging){
+      // 1) 一级评论总数（精确计数，用于分页与楼层锚点）
+      const { count } = await supabaseClient
+        .from('comments')
+        .select('id', { count: 'exact', head: true })
+        .eq('page_id', PAGE_ID)
+        .is('parent_id', null);
+      commentTotal = count || 0;
+      totalPages = Math.max(1, Math.ceil(commentTotal / PAGE_SIZE));
+      if(currentPage > totalPages) currentPage = totalPages;
+      if(currentPage < 1) currentPage = 1;
+      const start = (currentPage - 1) * PAGE_SIZE;
+      // 2) 当前页一级评论（按当前排序方向）
+      const { data: firsts, error: e1 } = await supabaseClient
+        .from('comments')
+        .select(commentSelect)
+        .eq('page_id', PAGE_ID)
+        .is('parent_id', null)
+        .order('created_at', { ascending: sortMode === 'time_asc' })
+        .range(start, start + PAGE_SIZE - 1);
+      if(e1) throw e1;
+      allComments = firsts || [];
+      // 3) 当前页一级评论的二级回复（用 parent_id in 精确拉取，避免全量）
+      if(allComments.length){
+        const parentIds = allComments.map(c => c.id);
+        const { data: replies, error: e2 } = await supabaseClient
+          .from('comments')
+          .select(commentSelect)
+          .eq('page_id', PAGE_ID)
+          .in('parent_id', parentIds)
+          .order('created_at', { ascending:true });
+        if(e2) throw e2;
+        allReplies = replies || [];
+      } else {
+        allReplies = [];
+      }
+    } else {
+      // 点赞排序：全量拉取（保持排序交互完整）
+      const { data: firsts, error: e1 } = await supabaseClient
+        .from('comments')
+        .select(commentSelect)
+        .eq('page_id', PAGE_ID)
+        .is('parent_id', null)
+        .order('created_at', { ascending:true });
+      if(e1) throw e1;
+      const { data: replies, error: e2 } = await supabaseClient
+        .from('comments')
+        .select(commentSelect)
+        .eq('page_id', PAGE_ID)
+        .not('parent_id', 'is', null)
+        .order('created_at', { ascending:true });
+      if(e2) throw e2;
+      allComments = firsts || [];
+      allReplies = replies || [];
+      commentTotal = allComments.length;
+      totalPages = Math.max(1, Math.ceil(commentTotal / PAGE_SIZE));
+      if(currentPage > totalPages) currentPage = totalPages;
+      if(currentPage < 1) currentPage = 1;
+    }
+    // 当前用户点赞集合
+    likedSet = new Set();
+    if(currentUser){
+      const { data: likes } = await supabaseClient
+        .from('comment_likes').select('comment_id').eq('user_id', currentUser.id);
+      likedSet = new Set((likes || []).map(l => l.comment_id));
+    }
+    document.getElementById('commentCount').textContent = commentTotal ? `共 ${commentTotal} 条` : '';
+    renderCommentList();
+  }catch(e){
+    document.getElementById('commentList').innerHTML = `<div class="empty">加载失败：${zhErr(e.message || '')}喵</div>`;
   }
-  document.getElementById('commentCount').textContent = allComments.length ? `共 ${allComments.length} 条` : '';
-  renderCommentList();
 }
 
 function renderCommentList(){
@@ -2438,25 +2497,46 @@ function renderCommentList(){
     document.getElementById('commentPager').style.display = 'none';
     return;
   }
-  // 楼层：按时间正序（最早=1楼），全量计算保证翻页后楼层号连贯
-  const chrono = [...allComments].sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
-  const floorMap = {};
-  chrono.forEach((c, i) => floorMap[c.id] = i + 1);
-  // 显示排序（全量排序后再分页）
-  let sorted = [...allComments];
-  if(sortMode === 'time_asc') sorted.sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
-  else if(sortMode === 'time_desc') sorted.sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
-  else if(sortMode === 'likes_desc') sorted.sort((a,b) => (b.like_count||0) - (a.like_count||0) || (new Date(b.created_at) - new Date(a.created_at)));
-  else if(sortMode === 'likes_asc') sorted.sort((a,b) => (a.like_count||0) - (b.like_count||0) || (new Date(a.created_at) - new Date(b.created_at)));
-  // 分页
-  totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
-  if(currentPage > totalPages) currentPage = totalPages;
-  if(currentPage < 1) currentPage = 1;
-  const start = (currentPage - 1) * PAGE_SIZE;
-  const pageItems = sorted.slice(start, start + PAGE_SIZE);
+  const useDbPaging = (sortMode === 'time_asc' || sortMode === 'time_desc');
+  let pageItems;
+  let baseFloor;
+  if(useDbPaging){
+    // 数据库分页：本页数据即最终展示，楼层按时间正序全局位置
+    // 正序：第i条 = 全局第 (页-1)*页大小+i+1 楼
+    // 倒序：第i条 = 全局倒数第 (页-1)*页大小+i+1 条 = 正序第 (总数-(页-1)*页大小-i) 楼
+    pageItems = allComments;
+    if(sortMode === 'time_asc'){
+      baseFloor = (currentPage - 1) * PAGE_SIZE;
+    } else {
+      // 倒序渲染时每条楼层 = commentTotal - (页-1)*SIZE - i
+      // 用负基准 + 负步进实现：floor = commentTotal - offset - i
+      baseFloor = commentTotal - (currentPage - 1) * PAGE_SIZE;
+    }
+  } else {
+    // 点赞排序：全量数据前端排序后切片，楼层仍按时间正序的全局位置（用 created_at 全量计算保证连贯）
+    const chrono = [...allComments].sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
+    const floorMap = {};
+    chrono.forEach((c, i) => floorMap[c.id] = i + 1);
+    let sorted = [...allComments];
+    if(sortMode === 'likes_desc') sorted.sort((a,b) => (b.like_count||0) - (a.like_count||0) || (new Date(b.created_at) - new Date(a.created_at)));
+    else if(sortMode === 'likes_asc') sorted.sort((a,b) => (a.like_count||0) - (b.like_count||0) || (new Date(a.created_at) - new Date(b.created_at)));
+    totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
+    if(currentPage > totalPages) currentPage = totalPages;
+    if(currentPage < 1) currentPage = 1;
+    const start = (currentPage - 1) * PAGE_SIZE;
+    pageItems = sorted.slice(start, start + PAGE_SIZE);
+    activeComments = allComments;
+    activeReplies = allReplies;
+    list.innerHTML = pageItems.map(c => renderComment(c, floorMap[c.id], allReplies.filter(r => r.parent_id === c.id))).join('');
+    renderPager();
+    return;
+  }
   activeComments = allComments;
   activeReplies = allReplies;
-  list.innerHTML = pageItems.map(c => renderComment(c, floorMap[c.id], allReplies.filter(r => r.parent_id === c.id))).join('');
+  list.innerHTML = pageItems.map((c, i) => {
+    const floor = (sortMode === 'time_asc') ? (baseFloor + i + 1) : (baseFloor - i);
+    return renderComment(c, floor, allReplies.filter(r => r.parent_id === c.id));
+  }).join('');
   renderPager();
 }
 
@@ -2479,7 +2559,9 @@ function renderPager(){
 function goPage(n){
   if(n < 1 || n > totalPages) return;
   currentPage = n;
-  renderCommentList();
+  // 时间排序走数据库分页重新拉取该页；点赞排序前端切片即可
+  if(sortMode === 'time_asc' || sortMode === 'time_desc') loadComments(false);
+  else renderCommentList();
 }
 
 function jumpPage(){
@@ -2489,7 +2571,8 @@ function jumpPage(){
   if(n < 1) n = 1;
   if(n > totalPages) n = totalPages;
   currentPage = n;
-  renderCommentList();
+  if(sortMode === 'time_asc' || sortMode === 'time_desc') loadComments(false);
+  else renderCommentList();
 }
 
 function renderComment(c, floor, replies){
@@ -2737,23 +2820,70 @@ async function loadProfileComments(reset){
     document.getElementById('profileCommentList').innerHTML = `<div class="empty">评论服务暂不可用，请稍后刷新喵</div>`;
     return;
   }
-  const { data: firsts, error: e1 } = await supabaseClient
-    .from('comments')
-    .select('*, author_uid, author:profiles!comments_author_id_fkey(id,nickname,username,uid,role,avatar_url)')
-    .eq('page_id', PAGE_ID)
-    .is('parent_id', null)
-    .order('created_at', { ascending:true });
-  if(e1){ document.getElementById('profileCommentList').innerHTML = `<div class="empty">加载失败：${zhErr(e1.message)}</div>`; return; }
-  const { data: replies } = await supabaseClient
-    .from('comments')
-    .select('*, author_uid, author:profiles!comments_author_id_fkey(id,nickname,username,uid,role,avatar_url)')
-    .eq('page_id', PAGE_ID)
-    .not('parent_id', 'is', null)
-    .order('created_at', { ascending:true });
-  pAllComments = firsts || [];
-  pAllReplies = replies || [];
-  document.getElementById('profileCommentCount').textContent = pAllComments.length ? `共 ${pAllComments.length} 条` : '';
-  renderProfileCommentList();
+  // 与首页评论区同策略：最新/最早走数据库分页（楼层连贯），点赞排序全量前端排序
+  const useDbPaging = (pSortMode === 'time_asc' || pSortMode === 'time_desc');
+  const commentSelect = '*, author_uid, author:profiles!comments_author_id_fkey(id,nickname,username,uid,role,avatar_url)';
+  try{
+    if(useDbPaging){
+      const { count } = await supabaseClient
+        .from('comments')
+        .select('id', { count: 'exact', head: true })
+        .eq('page_id', PAGE_ID)
+        .is('parent_id', null);
+      pCommentTotal = count || 0;
+      pTotalPages = Math.max(1, Math.ceil(pCommentTotal / PAGE_SIZE));
+      if(pCurrentPage > pTotalPages) pCurrentPage = pTotalPages;
+      if(pCurrentPage < 1) pCurrentPage = 1;
+      const start = (pCurrentPage - 1) * PAGE_SIZE;
+      const { data: firsts, error: e1 } = await supabaseClient
+        .from('comments')
+        .select(commentSelect)
+        .eq('page_id', PAGE_ID)
+        .is('parent_id', null)
+        .order('created_at', { ascending: pSortMode === 'time_asc' })
+        .range(start, start + PAGE_SIZE - 1);
+      if(e1) throw e1;
+      pAllComments = firsts || [];
+      if(pAllComments.length){
+        const parentIds = pAllComments.map(c => c.id);
+        const { data: replies, error: e2 } = await supabaseClient
+          .from('comments')
+          .select(commentSelect)
+          .eq('page_id', PAGE_ID)
+          .in('parent_id', parentIds)
+          .order('created_at', { ascending:true });
+        if(e2) throw e2;
+        pAllReplies = replies || [];
+      } else {
+        pAllReplies = [];
+      }
+    } else {
+      const { data: firsts, error: e1 } = await supabaseClient
+        .from('comments')
+        .select(commentSelect)
+        .eq('page_id', PAGE_ID)
+        .is('parent_id', null)
+        .order('created_at', { ascending:true });
+      if(e1) throw e1;
+      const { data: replies, error: e2 } = await supabaseClient
+        .from('comments')
+        .select(commentSelect)
+        .eq('page_id', PAGE_ID)
+        .not('parent_id', 'is', null)
+        .order('created_at', { ascending:true });
+      if(e2) throw e2;
+      pAllComments = firsts || [];
+      pAllReplies = replies || [];
+      pCommentTotal = pAllComments.length;
+      pTotalPages = Math.max(1, Math.ceil(pCommentTotal / PAGE_SIZE));
+      if(pCurrentPage > pTotalPages) pCurrentPage = pTotalPages;
+      if(pCurrentPage < 1) pCurrentPage = 1;
+    }
+    document.getElementById('profileCommentCount').textContent = pCommentTotal ? `共 ${pCommentTotal} 条` : '';
+    renderProfileCommentList();
+  }catch(e){
+    document.getElementById('profileCommentList').innerHTML = `<div class="empty">加载失败：${zhErr(e.message || '')}喵</div>`;
+  }
 }
 function renderProfileCommentList(){
   const list = document.getElementById('profileCommentList');
@@ -2762,22 +2892,38 @@ function renderProfileCommentList(){
     document.getElementById('profileCommentPager').style.display = 'none';
     return;
   }
-  const chrono = [...pAllComments].sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
-  const floorMap = {};
-  chrono.forEach((c, i) => floorMap[c.id] = i + 1);
-  let sorted = [...pAllComments];
-  if(pSortMode === 'time_asc') sorted.sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
-  else if(pSortMode === 'time_desc') sorted.sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
-  else if(pSortMode === 'likes_desc') sorted.sort((a,b) => (b.like_count||0)-(a.like_count||0) || (new Date(b.created_at)-new Date(a.created_at)));
-  else if(pSortMode === 'likes_asc') sorted.sort((a,b) => (a.like_count||0)-(b.like_count||0) || (new Date(a.created_at)-new Date(b.created_at)));
-  pTotalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
-  if(pCurrentPage > pTotalPages) pCurrentPage = pTotalPages;
-  if(pCurrentPage < 1) pCurrentPage = 1;
-  const start = (pCurrentPage - 1) * PAGE_SIZE;
-  const pageItems = sorted.slice(start, start + PAGE_SIZE);
+  const useDbPaging = (pSortMode === 'time_asc' || pSortMode === 'time_desc');
+  let pageItems;
+  let baseFloor;
+  if(useDbPaging){
+    pageItems = pAllComments;
+    baseFloor = (pSortMode === 'time_asc')
+      ? (pCurrentPage - 1) * PAGE_SIZE
+      : (pCommentTotal - (pCurrentPage - 1) * PAGE_SIZE);
+  } else {
+    const chrono = [...pAllComments].sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
+    const floorMap = {};
+    chrono.forEach((c, i) => floorMap[c.id] = i + 1);
+    let sorted = [...pAllComments];
+    if(pSortMode === 'likes_desc') sorted.sort((a,b) => (b.like_count||0)-(a.like_count||0) || (new Date(b.created_at)-new Date(a.created_at)));
+    else if(pSortMode === 'likes_asc') sorted.sort((a,b) => (a.like_count||0)-(b.like_count||0) || (new Date(a.created_at)-new Date(b.created_at)));
+    pTotalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
+    if(pCurrentPage > pTotalPages) pCurrentPage = pTotalPages;
+    if(pCurrentPage < 1) pCurrentPage = 1;
+    const start = (pCurrentPage - 1) * PAGE_SIZE;
+    pageItems = sorted.slice(start, start + PAGE_SIZE);
+    activeComments = pAllComments;
+    activeReplies = pAllReplies;
+    list.innerHTML = pageItems.map(c => renderComment(c, floorMap[c.id], pAllReplies.filter(r => r.parent_id === c.id))).join('');
+    renderProfilePager();
+    return;
+  }
   activeComments = pAllComments;
   activeReplies = pAllReplies;
-  list.innerHTML = pageItems.map(c => renderComment(c, floorMap[c.id], pAllReplies.filter(r => r.parent_id === c.id))).join('');
+  list.innerHTML = pageItems.map((c, i) => {
+    const floor = (pSortMode === 'time_asc') ? (baseFloor + i + 1) : (baseFloor - i);
+    return renderComment(c, floor, pAllReplies.filter(r => r.parent_id === c.id));
+  }).join('');
   renderProfilePager();
 }
 function renderProfilePager(){
@@ -2798,7 +2944,8 @@ function renderProfilePager(){
 function goProfilePage(n){
   if(n < 1 || n > pTotalPages) return;
   pCurrentPage = n;
-  renderProfileCommentList();
+  if(pSortMode === 'time_asc' || pSortMode === 'time_desc') loadProfileComments(false);
+  else renderProfileCommentList();
 }
 function jumpProfilePage(){
   const input = document.getElementById('profilePagerJumpInput');
@@ -2807,13 +2954,16 @@ function jumpProfilePage(){
   if(n < 1) n = 1;
   if(n > pTotalPages) n = pTotalPages;
   pCurrentPage = n;
-  renderProfileCommentList();
+  if(pSortMode === 'time_asc' || pSortMode === 'time_desc') loadProfileComments(false);
+  else renderProfileCommentList();
 }
 function setProfileSort(mode){
+  if(mode === pSortMode) return; // 重复点击同排序忽略
   pSortMode = mode;
   pCurrentPage = 1;
   document.getElementById('viewProfile').querySelectorAll('.sort-btn').forEach(b => b.classList.toggle('active', b.dataset.sort === mode));
-  renderProfileCommentList();
+  // 排序变化统一重新从数据库拉取第 1 页
+  loadProfileComments(false);
 }
 async function submitProfileComment(){
   if(!currentUser){ alert('请先登录喵'); return; }
@@ -2861,6 +3011,8 @@ async function submitProfileComment(){
     cancelProfileReply();
     setCommentBtnLoading(btn, false);
     setCommentStatus('profileCommentStatus', '✓ 评论发布成功喵', 'ok');
+    // 发新评论后跳回第 1 页，确保能看到自己的评论
+    pCurrentPage = 1;
     await loadProfileComments(false);
     setTimeout(()=>{ setCommentStatus('profileCommentStatus', '', ''); }, 2600);
   }catch(err){
@@ -3266,8 +3418,10 @@ function escapeHtml(s){
 const FORUM_PAGE_SIZE = 20;        // 论坛列表每页帖子数
 let forumPage = 1;                 // 当前论坛页码
 let forumTotalPages = 1;
+let forumTotal = 0;                // 当前筛选下的普通帖总数（数据库 count）
+let forumPinnedPosts = [];         // 置顶帖（始终固定在列表顶部，不受分页影响）
 let forumFilter = 'all';           // all / essence / notice
-let allForumPosts = [];            // 论坛帖子全量（含作者）
+let allForumPosts = [];            // 当前页普通帖（含作者）
 let currentForumPost = null;       // 正在查看的帖子
 let currentForumReplies = [];      // 当前帖子的回帖（主回帖）
 let currentForumLZL = [];          // 当前帖子的楼中楼
@@ -3343,49 +3497,58 @@ async function loadForum(reset){
     return;
   }
   list.innerHTML = `<div class="loading">加载中喵...</div>`;
-  const { data, error } = await supabaseClient
-    .from('forum_posts')
-    .select('id,title,content,image_url,author_id,post_type,is_pinned,is_essence,notice_slot,reply_count,last_reply_at,created_at,lottery:forum_lotteries(post_id,status,prizes,deadline,winner_count,claim_note,draw_mode,max_entries,entry_count,banned_count),author:profiles!forum_posts_author_id_fkey(id,nickname,username,uid,role,avatar_url)')
-    .order('created_at', { ascending:false });
-  if(error){
-    list.innerHTML = `<div class="empty">加载失败：${zhErr(error.message)}</div>`;
-    return;
+  const postSelect = 'id,title,content,image_url,author_id,post_type,is_pinned,is_essence,notice_slot,reply_count,last_reply_at,created_at,lottery:forum_lotteries(post_id,status,prizes,deadline,winner_count,claim_note,draw_mode,max_entries,entry_count,banned_count),author:profiles!forum_posts_author_id_fkey(id,nickname,username,uid,role,avatar_url)';
+  try{
+    // 1) 置顶帖：始终固定在顶部，数量少一次全查（不受分页影响），但同样遵循当前筛选
+    let pinQ = supabaseClient
+      .from('forum_posts')
+      .select(postSelect)
+      .eq('is_pinned', true)
+      .order('created_at', { ascending:false });
+    if(forumFilter === 'essence') pinQ = pinQ.eq('is_essence', true);
+    else if(forumFilter === 'notice') pinQ = pinQ.eq('post_type', 'notice');
+    const { data: pinned, error: ep } = await pinQ;
+    if(ep) throw ep;
+    forumPinnedPosts = pinned || [];
+    // 2) 普通帖（非置顶）：按当前筛选走数据库分页 + 精确计数
+    let q = supabaseClient
+      .from('forum_posts')
+      .select(postSelect, { count: 'exact' })
+      .eq('is_pinned', false)
+      .order('last_reply_at', { ascending:false, nullsFirst:false })
+      .order('created_at', { ascending:false });
+    if(forumFilter === 'essence') q = q.eq('is_essence', true);
+    else if(forumFilter === 'notice') q = q.eq('post_type', 'notice');
+    const startIdx = (forumPage - 1) * FORUM_PAGE_SIZE;
+    const { data, count, error } = await q.range(startIdx, startIdx + FORUM_PAGE_SIZE - 1);
+    if(error) throw error;
+    allForumPosts = data || [];
+    forumTotal = count || 0;
+    forumTotalPages = Math.max(1, Math.ceil(forumTotal / FORUM_PAGE_SIZE));
+    if(forumPage > forumTotalPages){ forumPage = forumTotalPages; }
+    document.getElementById('forumCount').textContent = forumTotal ? `共 ${forumTotal} 帖` : '';
+    renderForumList();
+  }catch(e){
+    list.innerHTML = `<div class="empty">加载失败：${zhErr(e.message || '')}喵</div>`;
   }
-  allForumPosts = data || [];
-  document.getElementById('forumCount').textContent = allForumPosts.length ? `共 ${allForumPosts.length} 帖` : '';
-  renderForumList();
 }
 function setForumFilter(f){
   forumFilter = f;
   forumPage = 1;
   document.querySelectorAll('#viewForum .sort-btn').forEach(b => b.classList.toggle('active', b.dataset.fs === f));
-  renderForumList();
+  loadForum(false);   // 切换筛选重新从数据库按筛选拉取分页数据
 }
 function renderForumList(){
   const list = document.getElementById('forumList');
-  let items = [...allForumPosts];
-  if(forumFilter === 'essence') items = items.filter(p => p.is_essence);
-  else if(forumFilter === 'notice') items = items.filter(p => p.post_type === 'notice');
+  // 置顶帖 + 当前页普通帖合并展示；置顶帖内按最新在前
+  const pinnedSorted = [...forumPinnedPosts].sort((a,b) => new Date(b.last_reply_at || b.created_at) - new Date(a.last_reply_at || a.created_at));
+  let items = [...pinnedSorted, ...allForumPosts];
   if(!items.length){
     list.innerHTML = `<div class="empty">还没有帖子，快来发第一帖喵~</div>`;
     document.getElementById('forumPager').style.display = 'none';
     return;
   }
-  // 排序：仅置顶贴排最前（公告/精华是独立属性，不影响排序位置），再按最后回复时间（无人回按发帖时间）
-  items.sort((a,b) => {
-    const pa = a.is_pinned ? 1 : 0;
-    const pb = b.is_pinned ? 1 : 0;
-    if(pa !== pb) return pb - pa;
-    const ta = a.last_reply_at || a.created_at;
-    const tb = b.last_reply_at || b.created_at;
-    return new Date(tb) - new Date(ta);
-  });
-  // 分页
-  forumTotalPages = Math.max(1, Math.ceil(items.length / FORUM_PAGE_SIZE));
-  if(forumPage > forumTotalPages) forumPage = forumTotalPages;
-  const start = (forumPage - 1) * FORUM_PAGE_SIZE;
-  const pageItems = items.slice(start, start + FORUM_PAGE_SIZE);
-  list.innerHTML = pageItems.map(p => renderForumItem(p)).join('');
+  list.innerHTML = items.map(p => renderForumItem(p)).join('');
   const pager = document.getElementById('forumPager');
   if(forumTotalPages <= 1){ pager.style.display = 'none'; }
   else {
@@ -3399,7 +3562,7 @@ function renderForumList(){
 function forumGoPage(n){
   if(n < 1 || n > forumTotalPages) return;
   forumPage = n;
-  renderForumList();
+  loadForum(false);   // 翻页重新从数据库拉取该页数据
 }
 function renderForumItem(p){
   const author = p.author || {};
@@ -3573,12 +3736,12 @@ function renderForumPost(){
   const role = author.role === 'owner' ? '<span class="role-badge role-owner">站长</span>' :
                author.role === 'admin' ? '<span class="role-badge role-admin">管理员</span>' : '';
   const mainImg = p.image_url
-    ? `<div><img class="fp-main-img" src="${escapeHtml(p.image_url)}" alt="帖子配图" onclick="window.open('${escapeHtml(p.image_url)}')"></div>` : '';
+    ? `<div><img class="fp-main-img" src="${escapeHtml(p.image_url)}" alt="帖子配图" loading="lazy" onclick="window.open('${escapeHtml(p.image_url)}')"></div>` : '';
   // 楼主楼层（1楼）
   const lzHtml = `
     <div class="fp-lz">
       <div class="fp-reply-meta">
-        <img src="${escapeHtml(author.avatar_url || DEFAULT_AVATAR)}" alt="" style="width:32px;height:32px;border-radius:6px" ondblclick="openProfile('${p.author_id}')" title="双击查看TA的主页">
+        <img src="${escapeHtml(author.avatar_url || DEFAULT_AVATAR)}" alt="" style="width:32px;height:32px;border-radius:6px" loading="lazy" ondblclick="openProfile('${p.author_id}')" title="双击查看TA的主页">
         <span style="font-weight:600;color:var(--ink-800)">${name}</span>${role}
         <span class="comment-uid">UID ${author.uid != null ? author.uid : '?'}</span>
       </div>
@@ -3779,7 +3942,7 @@ function renderLotteryCard(p){
           const contact = canManageLottery && w.contact
             ? `<span class="lw-contact">📞 ${escapeHtml(w.contact)}</span>` : '';
           return `<div class="lottery-winner-item">
-            <img src="${avatar}" onerror="this.onerror=null;this.src='${DEFAULT_AVATAR}'">
+            <img src="${avatar}" loading="lazy" onerror="this.onerror=null;this.src='${DEFAULT_AVATAR}'">
             <span class="lw-name">${uname}</span>
             <span class="lw-prize">🏆 ${escapeHtml(w.prize_name)}</span>
             ${claimedText}${contact}
@@ -3812,7 +3975,7 @@ function renderLotteryCard(p){
       const entryTime = e.created_at ? new Date(e.created_at).toLocaleString('zh-CN', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' }) : '';
       const isSelf = currentUser && e.user_id === currentUser.id;
       return `<div class="lottery-participant-item">
-        <img src="${avatar}" onerror="this.onerror=null;this.src='${DEFAULT_AVATAR}'">
+        <img src="${avatar}" loading="lazy" onerror="this.onerror=null;this.src='${DEFAULT_AVATAR}'">
         <span class="lp-name">${uname}</span>${roleTag}
         <span class="lp-uid">UID ${u.uid != null ? u.uid : '?'}</span>
         <span class="lp-time">${entryTime}</span>
@@ -3828,7 +3991,7 @@ function renderLotteryCard(p){
       const uname = escapeHtml(u.nickname || u.username || '神秘用户');
       const avatar = escapeHtml(u.avatar_url || DEFAULT_AVATAR);
       return `<div class="lottery-participant-item">
-        <img src="${avatar}" onerror="this.onerror=null;this.src='${DEFAULT_AVATAR}'">
+        <img src="${avatar}" loading="lazy" onerror="this.onerror=null;this.src='${DEFAULT_AVATAR}'">
         <span class="lp-name">${uname}</span>
         <span class="lp-uid">UID ${u.uid != null ? u.uid : '?'}</span>
         <span class="lp-time" style="color:#c0392b">🚫 已禁抽</span>
@@ -4109,7 +4272,7 @@ function renderForumReply(r, post){
   const role = author.role === 'owner' ? '<span class="role-badge role-owner">站长</span>' :
                author.role === 'admin' ? '<span class="role-badge role-admin">管理员</span>' : '';
   const uid = author.uid != null ? `<span class="comment-uid">UID ${author.uid}</span>` : '';
-  const img = r.image_url ? `<div><img class="fp-reply-img" src="${escapeHtml(r.image_url)}" alt="回帖图片" onclick="window.open('${escapeHtml(r.image_url)}')"></div>` : '';
+  const img = r.image_url ? `<div><img class="fp-reply-img" src="${escapeHtml(r.image_url)}" alt="回帖图片" loading="lazy" onclick="window.open('${escapeHtml(r.image_url)}')"></div>` : '';
   const liked = forumLikedSet.has(r.id);
   const likeBtn = `<button class="btn btn-ghost btn-small like-btn${liked ? ' liked' : ''}" onclick="toggleForumLike('${r.id}')">${liked ? '❤️' : '🤍'} ${r.like_count || 0}</button>`;
   const replyBtn = `<button class="btn btn-ghost btn-small" onclick="startForumReply('${r.id}','${escapeHtml(name)}')">回复</button>`;
@@ -4155,7 +4318,7 @@ function renderForumLZL(l, parent){
     currentUser.id === parent.author_id
   );
   const delBtn = canDel ? `<button class="btn btn-bad btn-small" onclick="deleteForumReply('${l.id}')">删除</button>` : '';
-  const img = l.image_url ? `<div><img class="fp-reply-img" style="max-height:150px" src="${escapeHtml(l.image_url)}" alt="" onclick="window.open('${escapeHtml(l.image_url)}')"></div>` : '';
+  const img = l.image_url ? `<div><img class="fp-reply-img" style="max-height:150px" src="${escapeHtml(l.image_url)}" alt="" loading="lazy" onclick="window.open('${escapeHtml(l.image_url)}')"></div>` : '';
   return `
   <div class="fp-lzl-item" data-id="${l.id}">
     <div class="fp-lzl-avatar" ondblclick="openProfile('${l.author_id}')" title="双击查看TA的主页"><img src="${escapeHtml(author.avatar_url || DEFAULT_AVATAR)}" alt="" loading="lazy" onerror="this.onerror=null;this.src='${DEFAULT_AVATAR}'"></div>
