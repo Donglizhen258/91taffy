@@ -1933,8 +1933,8 @@ async function submitComment(){
       const { data: { publicUrl } } = supabaseClient.storage.from('comment-images').getPublicUrl(path);
       imageUrl = publicUrl;
     }
-    // 转义内容中的表情标记
-    let content = text;
+    // 先转义用户输入（防 XSS），再把表情标记替换成安全的 img 标签
+    let content = escapeHtml(text);
     EMOJIS.forEach(([name]) => {
       const marker = `[em:${name}]`;
       const repl = `<img class="emoji" src="${EMOJIS.find(e=>e[0]===name)[1]}" alt="${name}">`;
@@ -2403,7 +2403,8 @@ async function submitProfileComment(){
       const { data: { publicUrl } } = supabaseClient.storage.from('comment-images').getPublicUrl(path);
       imageUrl = publicUrl;
     }
-    let content = text;
+    // 先转义用户输入（防 XSS），再把表情标记替换成安全的 img 标签
+    let content = escapeHtml(text);
     EMOJIS.forEach(([name]) => {
       const marker = `[em:${name}]`;
       const repl = `<img class="emoji" src="${EMOJIS.find(e=>e[0]===name)[1]}" alt="${name}">`;
@@ -3240,7 +3241,7 @@ function renderLotteryCard(p){
     drawBtn += `<button class="btn btn-ok btn-small" onclick="finishMyInstantLottery()">🏁 ${expired ? '结束抽奖' : '提前结束'}</button>`;
   }
 
-  // 我的中奖卡（实体/虚拟都需先填具体信息/联系方式领取；虚拟奖品领取后展示兑换码）
+  // 我的中奖卡（虚拟奖品中奖即视为已领取，兑换码直接展示；实体奖品需填联系方式领取）
   let myCard = '';
   if(myWin){
     const w = myWin;
@@ -3253,14 +3254,26 @@ function renderLotteryCard(p){
       const contactText = w.contact ? `<div style="font-size:12px;color:var(--ink-400);margin-top:4px">📞 已登记联系方式：${escapeHtml(w.contact)}</div>` : '';
       myCard = `<div class="lottery-mycard">🎉 恭喜中奖「<b>${escapeHtml(w.prize_name)}</b>」！已领取喵 ${w.claimed_at ? '（'+new Date(w.claimed_at).toLocaleString('zh-CN')+'）' : ''}${codeBox}${contactText}</div>`;
     } else {
-      const typeText = w.prize_type === 'physical' ? '这是实体奖品' : '这是虚拟奖品，领取后即可看到兑换码';
-      myCard = `<div class="lottery-mycard">
-        🎉 恭喜中奖「<b>${escapeHtml(w.prize_name)}</b>」！${typeText}，请先填写你的具体信息/联系方式（QQ/微信/电话等）领取喵：<br>
-        <div style="display:flex;gap:8px;margin-top:8px">
-          <input type="text" id="lotteryContactInput" placeholder="填写 QQ / 微信 / 电话 / 收货信息" style="flex:1;padding:8px 10px;border:1px solid rgba(178,58,99,.4);border-radius:4px;font-size:13px;color:var(--ink-900);background:#fff;outline:none">
-          <button class="btn btn-small" onclick="claimMyLottery()">确认领取</button>
-        </div>
-      </div>`;
+      // 未领取：实体奖品需填联系方式；虚拟奖品（兼容旧数据残留）直接点领取即可看兑换码
+      if(w.prize_type === 'physical'){
+        myCard = `<div class="lottery-mycard">
+          🎉 恭喜中奖「<b>${escapeHtml(w.prize_name)}</b>」！这是实体奖品，请先填写你的具体信息/联系方式（QQ/微信/电话等）领取喵：<br>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <input type="text" id="lotteryContactInput" placeholder="填写 QQ / 微信 / 电话 / 收货信息" style="flex:1;padding:8px 10px;border:1px solid rgba(178,58,99,.4);border-radius:4px;font-size:13px;color:var(--ink-900);background:#fff;outline:none">
+            <button class="btn btn-small" onclick="claimMyLottery()">确认领取</button>
+          </div>
+        </div>`;
+      } else {
+        myCard = `<div class="lottery-mycard">
+          🎉 恭喜中奖「<b>${escapeHtml(w.prize_name)}</b>」！这是虚拟奖品，点击下方按钮即可查看兑换码喵：<br>
+          <button class="btn btn-small" style="margin-top:8px" onclick="claimMyLottery()">🔑 领取并查看兑换码</button>
+        </div>`;
+      }
+    }
+  } else if(currentUser && myEntry){
+    // 未中奖：已参与但未出现在中奖名单（开奖后显示明确的未中奖状态）
+    if(!isDrawing){
+      myCard = `<div class="lottery-mycard" style="color:var(--ink-600)">😿 很遗憾，这次没有中奖喵，下次再接再厉！</div>`;
     }
   }
 
@@ -3399,10 +3412,10 @@ async function drawInstant(){
   const { data, error } = await supabaseClient.rpc('draw_lottery_instant', { p_post_id: currentForumPost.id });
   if(error){ alert(zhErr(error.message)); return; }
   if(data && data.won){
-    if(data.prize_type === 'virtual' && data.code){
-      alert(`🎉 恭喜中奖「${data.prize_name}」！\n\n请在卡片上填写你的联系方式领取后，即可查看兑换码喵！`);
+    if(data.prize_type === 'virtual'){
+      alert(`🎉 恭喜中奖「${data.prize_name}」！\n\n兑换码已生成，就在下方卡片里，可直接复制兑换喵！`);
     } else if(data.prize_type === 'physical'){
-      alert(`🎉 恭喜中奖「${data.prize_name}」！\n\n请填写具体信息/联系方式领取实体奖品喵！`);
+      alert(`🎉 恭喜中奖「${data.prize_name}」！\n\n请在卡片上填写具体信息/联系方式领取实体奖品喵！`);
     } else {
       alert(`🎉 恭喜中奖「${data.prize_name}」！`);
     }
@@ -3456,19 +3469,22 @@ async function finishMyInstantLottery(){
   await refreshLotteryData();
   renderForumPost();
 }
-// 领取奖品（虚拟直接领 / 实体需填联系方式）
+// 领取奖品（虚拟直接领，无需联系方式 / 实体需填联系方式）
 async function claimMyLottery(){
   if(!currentUser || !currentForumPost) return;
   const myWin = currentLotteryWinners.find(w => w.user_id === currentUser.id);
   if(!myWin) return;
-  const input = document.getElementById('lotteryContactInput');
-  const contact = input ? input.value.trim() : '';
-  if(!contact){ alert('请先填写你的具体信息/联系方式（QQ/微信/电话等）才能领取喵'); return; }
+  let contact = '';
+  if(myWin.prize_type === 'physical'){
+    const input = document.getElementById('lotteryContactInput');
+    contact = input ? input.value.trim() : '';
+    if(!contact){ alert('请先填写你的具体信息/联系方式（QQ/微信/电话等）才能领取喵'); return; }
+  }
   const { error } = await supabaseClient.rpc('claim_lottery_prize', {
     p_post_id: currentForumPost.id, p_contact: contact
   });
   if(error){ alert(zhErr(error.message)); return; }
-  alert('领取成功喵！🎉');
+  alert(myWin.prize_type === 'physical' ? '领取成功喵！🎉' : '领取成功，兑换码已展示喵！🎉');
   await refreshLotteryData();
   renderForumPost();
 }
