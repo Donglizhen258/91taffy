@@ -9,3 +9,7 @@ __pycache__/
 
 # 旧表情静态占位备份（本地保留，不入库）
 _emoji_backup/
+
+# Supabase 管理令牌（本地凭据，绝不入库）
+.env.local
+*.secret
