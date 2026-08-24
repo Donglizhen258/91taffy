@@ -919,10 +919,10 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
         <option value="女">女</option>
       </select>
     </div>
-    <div class="field" id="regCodeField" style="display:none">
+    <div class="field" id="regCodeField">
       <label>邮箱验证码</label>
       <div style="display:flex;gap:8px">
-        <input id="regCode" type="text" inputmode="numeric" maxlength="6" placeholder="6位数字" style="flex:1;min-width:0">
+        <input id="regCode" type="text" inputmode="numeric" maxlength="6" placeholder="先点右侧发送，再回填6位码" style="flex:1;min-width:0">
         <button class="btn btn-small" id="regSendBtn" style="white-space:nowrap" onclick="sendRegCode()">发送验证码</button>
       </div>
     </div>
@@ -1535,8 +1535,8 @@ function showLogin(){
 function showRegister(){
   clearErr();
   document.getElementById('loginModal').classList.remove('show'); // 关掉登录弹窗
-  // 重置验证码流程状态：默认先填基础信息，验证码栏未输入邮箱前不显示
-  document.getElementById('regCodeField').style.display = 'none';
+  // 验证码栏默认可见：用户一眼能看到「邮箱验证码」输入框和「发送验证码」按钮
+  document.getElementById('regCodeField').style.display = '';
   document.getElementById('regCode').value = '';
   document.getElementById('regSendBtn').disabled = false;
   document.getElementById('regSendBtn').textContent = '发送验证码';
