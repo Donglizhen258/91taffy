@@ -500,16 +500,16 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
   <span class="bar"></span><span class="bar"></span><span class="bar"></span>
 </div>
 <div class="nav-menu" id="navMenu">
-  <div class="nav-item active" id="navHome" onclick="switchView('home')">
+  <div class="nav-item active" id="navHome" onclick="goRoute('home')">
     <span class="nav-ico">🏠</span>首页
   </div>
-  <div class="nav-item" id="navForum" onclick="switchView('forum')">
+  <div class="nav-item" id="navForum" onclick="goRoute('forum')">
     <span class="nav-ico">💬</span>塔菲论坛
   </div>
-  <div class="nav-item" id="navAccount" onclick="switchView('account')">
+  <div class="nav-item" id="navAccount" onclick="goRoute('account')">
     <span class="nav-ico">👤</span>账号管理
   </div>
-  <div class="nav-item" id="navAdmin" style="display:none" onclick="switchView('admin')">
+  <div class="nav-item" id="navAdmin" style="display:none" onclick="goRoute('admin')">
     <span class="nav-ico">⚙️</span>网站管理
   </div>
 </div>
@@ -832,7 +832,7 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
   <div class="view" id="viewForumPost">
     <div class="card">
       <div class="forum-post-top">
-        <button class="btn btn-ghost btn-small" onclick="switchView('forum')">← 返回列表</button>
+        <button class="btn btn-ghost btn-small" onclick="goRoute('forum')">← 返回列表</button>
         <div style="margin-left:auto;display:flex;gap:8px">
           <button class="btn btn-ghost btn-small" id="forumNoticeBtn" style="display:none" onclick="toggleForumNotice()">📢 公告</button>
           <button class="btn btn-ghost btn-small" id="forumPinBtn" style="display:none" onclick="toggleForumPin()">📌 置顶</button>
@@ -1081,6 +1081,99 @@ function setCommentLocked(locked){
 function toggleNav(){
   document.getElementById('navMenu').classList.toggle('show');
 }
+
+// ================== 站内 hash 路由 ==================
+// 目标：浏览器后退/前进键按站内层级回退（首页→论坛→帖子→后退回论坛），而不是直接退出网站
+// hash 格式：#/home  #/forum  #/forum/post/<帖子id>  #/profile/<用户id>  #/account  #/admin
+// 原则：
+//   - 导航/下钻操作（进帖子、进资料页、切导航）走 goRoute() 写 history
+//   - 非导航操作（翻页/点赞/排序/发评论）绝不写 hash，保持 switchView 内部切换
+//   - 帖子详情依赖异步数据：hash 进入时若无数据则 openForumPost 补拉
+let currentRoute = 'home';   // 当前路由名（不含参数），用于导航高亮
+let lastRouteKey = '';       // 上次已处理的路由 key，防止重复触发重入
+let routerPending = false;   // 路由处理中标记（异步加载），完成后若 hash 又变则再处理一次
+let pendingRouteKey = null;  // 路由忙时暂存的新目标 key
+
+function parseHash(){
+  const h = (location.hash || '').replace(/^#\/?/, '');
+  if(!h) return { name: 'home', param: null };
+  const parts = h.split('/');
+  const name = parts[0];
+  if(name === 'forum' && parts[1] === 'post') return { name: 'forumPost', param: parts[2] || null };
+  if(name === 'profile') return { name: 'profile', param: parts[1] || null };
+  if(['home','forum','account','admin'].includes(name)) return { name, param: null };
+  return { name: 'home', param: null };  // 未知 hash 回首页
+}
+
+// 导航入口：写入 hash 触发历史 + hashchange
+function goRoute(path){
+  const target = '#' + (path.startsWith('/') ? path : '/' + path);
+  if(location.hash === target) { handleRoute(); return; }
+  location.hash = target;
+}
+
+function routeKey(){
+  const { name, param } = parseHash();
+  return name + (param ? '|' + param : '');
+}
+
+// 路由执行：解析 hash → 渲染对应视图
+async function handleRoute(){
+  const key = routeKey();
+  if(key === lastRouteKey && !routerPending) return;   // 同路由已处理且空闲，忽略
+  // 若正忙（异步加载中）则记录待处理，等完成后再跑一次，避免连续切换被吞
+  if(routerPending){
+    pendingRouteKey = key;
+    return;
+  }
+  routerPending = true;
+  pendingRouteKey = null;
+  try{
+    const { name, param } = parseHash();
+    currentRoute = name;
+    if(name === 'forumPost'){
+      // 帖子详情：有数据直接切视图；无数据（如刷新/直接访问）则补拉
+      if(currentForumPost && String(currentForumPost.id) === String(param)){
+        switchView('forumPost');
+      } else if(param){
+        await openForumPost(param, true);   // 静默模式：不写 hash，避免循环
+      } else {
+        switchView('forum');
+      }
+    } else if(name === 'profile'){
+      // 资料页：有数据直接切视图；无数据补拉
+      if(param){
+        if(viewingUserId && String(viewingUserId) === String(param) && document.getElementById('profileName').textContent !== '用户不存在'){
+          switchView('profile');
+        } else {
+          await openProfile(param, true);
+        }
+      } else {
+        switchView('home');
+      }
+    } else if(name === 'account'){
+      // 未登录也能看账号管理（会显示登录/注册），保持原行为
+      switchView('account');
+    } else if(name === 'admin'){
+      switchView('admin');
+    } else {
+      switchView('home');
+    }
+    lastRouteKey = key;
+  }catch(e){
+    console.error('路由渲染失败', e);
+    switchView('home');
+    lastRouteKey = key;
+  }finally{
+    routerPending = false;
+    // 处理期间 hash 又变了：补一次
+    if(pendingRouteKey && pendingRouteKey !== key){
+      setTimeout(() => handleRoute(), 0);
+    }
+    pendingRouteKey = null;
+  }
+}
+window.addEventListener('hashchange', handleRoute);
 function switchView(name){
   document.getElementById('navMenu').classList.remove('show');
   const home = document.getElementById('viewHome');
@@ -1128,6 +1221,8 @@ function switchView(name){
     PAGE_ID = 'home';
     ACTIVE = 'home';
     forumPost.classList.add('show');
+    // 帖子属于论坛层级，高亮「塔菲论坛」导航项（后退回论坛时视觉连贯）
+    if(navForum) navForum.classList.add('active');
     if(typeof renderForumPost === 'function') renderForumPost();
   } else if(name === 'admin'){
     // 仅站长/管理员可进入该视图
@@ -1138,10 +1233,11 @@ function switchView(name){
       navAdmin.classList.add('active');
       renderAdminPanel();
     } else {
-      // 没权限：退回首页
+      // 没权限：退回首页（同步修正 hash，避免地址栏停在 #/admin 导致后退键异常）
       home.classList.add('show');
       navHome.classList.add('active');
       alert('该页面仅限站长/管理员访问喵');
+      if(location.hash && location.hash.indexOf('/admin') !== -1) goRoute('home');
     }
   } else if(name === 'profile'){
     profile.classList.add('show');
@@ -1442,9 +1538,9 @@ async function init(){
   }catch(e){
     console.error('会话加载失败', e);
   }
-  await loadComments(true);
-  if(typeof loadAnnouncement === 'function') loadAnnouncement();
-  if(typeof loadForum === 'function') loadForum(true);
+  // 按当前 hash 进入对应视图（支持刷新后停留在原页/直接访问深链接），无 hash 默认首页
+  // switchView 内部会按视图加载评论/论坛/公告，无需重复调用
+  await handleRoute();
 }
 init();
 
@@ -2722,14 +2818,16 @@ function openMyProfile(){
 }
 // 资料页：右上角按钮在「我的视角」（查看自己主页）时显示，点击返回账号管理
 function backToMyAccount(){
-  switchView('account');
+  goRoute('account');
 }
-async function openProfile(userId){
+// silent=true：由路由触发（back/forward/直接访问 hash），不再写 hash 避免循环
+async function openProfile(userId, silent){
   if(!userId){ alert('该用户已注销，无法查看主页喵'); return; }
   viewingUserId = userId;
   PAGE_ID = 'profile_' + userId;
   ACTIVE = 'profile';
-  switchView('profile');
+  if(silent) switchView('profile');
+  else goRoute('profile/' + userId);
   await loadProfile(userId);
 }
 function banStatusText(p){
@@ -3610,7 +3708,8 @@ function renderForumItem(p){
 }
 
 // ===== 帖子详情 =====
-async function openForumPost(id){
+// silent=true：由路由触发（back/forward/直接访问 hash），不再写 hash 避免循环
+async function openForumPost(id, silent){
   if(!id){ alert('帖子不存在喵'); return; }
   const { data, error } = await supabaseClient
     .from('forum_posts')
@@ -3619,6 +3718,9 @@ async function openForumPost(id){
     .maybeSingle();
   if(error || !data){
     alert('帖子不存在或已删除喵');
+    // 帖子已不存在：路由回退到论坛列表（静默时用 switchView，避免循环）
+    if(silent) switchView('forum');
+    else goRoute('forum');
     return;
   }
   currentForumPost = data;
@@ -3707,7 +3809,9 @@ async function openForumPost(id){
       .select('reply_id').eq('user_id', currentUser.id);
     forumLikedSet = new Set((likes || []).map(l => l.reply_id));
   }
-  switchView('forumPost');
+  // 视图切换：静默（路由触发）直接切视图；用户点击进入则写 hash 进历史
+  if(silent) switchView('forumPost');
+  else goRoute('forum/post/' + id);
 }
 function renderForumPost(){
   const p = currentForumPost;
@@ -4673,8 +4777,9 @@ async function deleteForumPost(){
   alert('帖子已删除喵');
   currentForumPost = null;
   loadAnnouncement();
-  switchView('forum');
-  loadForum(true);
+  // 走路由回论坛列表（写历史），避免后退键回到已删除帖子的 hash
+  goRoute('forum');
+  // goRoute 触发 hashchange → handleRoute → switchView('forum') → loadForum(true)，无需重复加载
 }
 async function deleteForumReply(replyId){
   if(!confirm('确定删除这条回帖吗喵？删除后其下的楼中楼回复也会一并删除喵。')) return;
