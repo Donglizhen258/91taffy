@@ -1635,7 +1635,6 @@ async function sendRegCode(){
       email,
       options:{
         shouldCreateUser: true,           // 允许创建新用户（注册）
-        emailRedirectTo: window.location.origin,
         data:{ username:nick, nickname:nick, gender:document.getElementById('regGender').value }
       }
     }),
