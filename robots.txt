@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+# 资产与库文件无需收录
+Disallow: /assets/vendor/
+Disallow: /assets/emojis/
+
+# 方便搜索引擎定位 sitemap
+Sitemap: https://www.91taffy.com/sitemap.xml
