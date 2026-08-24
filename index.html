@@ -2879,8 +2879,8 @@ let currentLottery = null;         // 当前帖子详情里的抽奖配置
 let currentLotteryEntries = [];    // 当前帖子参与记录（含作者）
 let currentLotteryWinners = [];    // 当前帖子中奖记录（本人可见，含 code）
 let currentLotteryDisplayWinners = []; // 展示用中奖名单（RPC 脱敏/完整）
-let currentLotteryBans = [];       // 当前帖子禁抽名单（仅楼主/站长/管理员可见）
-let currentLotteryPrizeStatus = []; // 奖品分配明细（仅楼主/站长/管理员可见，用于回收未抽完的虚拟奖品）
+let currentLotteryBans = [];       // 当前帖子禁抽名单（仅发帖人/站长可见）
+let currentLotteryPrizeStatus = []; // 奖品分配明细（仅发帖人/站长可见，用于回收未抽完的虚拟奖品）
 
 // ===== 公告横幅（首页顶端，三栏位） =====
 let noticeSlotPosts = { 1: null, 2: null, 3: null };
@@ -3082,13 +3082,13 @@ async function openForumPost(id){
         .eq('post_id', id),
       // 展示用中奖名单（RPC 脱敏：普通用户无 code/contact，管理层完整）
       supabaseClient.rpc('get_lottery_winners', { p_post_id: id }),
-      // 禁抽名单：仅楼主/站长/管理员可读（RLS 已限制，普通用户会拿到空/失败，静默处理）
+      // 禁抽名单：仅发帖人/站长可读（RLS 已限制，其他用户会拿到空/失败，静默处理）
       isLtManager
         ? supabaseClient.from('forum_lottery_bans')
             .select('post_id,user_id,created_at,user:profiles!forum_lottery_bans_user_id_fkey(id,nickname,username,uid,avatar_url)')
             .eq('post_id', id)
         : Promise.resolve({ data: [] }),
-      // 奖品分配明细：仅楼主/站长/管理员可查（用于回收未抽完的虚拟奖品）
+      // 奖品分配明细：仅发帖人/站长可查（用于回收未抽完的虚拟奖品）
       isLtManager
         ? supabaseClient.rpc('get_lottery_prize_status', { p_post_id: id })
         : Promise.resolve({ data: [] })
@@ -3315,7 +3315,7 @@ function renderLotteryCard(p){
     actionHtml = `<button class="btn" onclick="showLogin()">登录后参与抽奖</button>`;
   }
 
-  // 开奖按钮（定时模式：站长/管理员 或 楼主，进行中——截止前可提前开，截止后仍可手动开，防止无人访问卡死）
+  // 开奖按钮（定时模式：站长 或 发帖人，进行中——截止前可提前开，截止后仍可手动开，防止无人访问卡死）
   let drawBtn = '';
   if(isDrawing && !isInstant && canDraw){
     drawBtn = `<button class="btn btn-ok btn-small" onclick="drawMyLottery()">🎲 ${expired ? '立即开奖' : '手动开奖'}</button>`;
@@ -3397,7 +3397,7 @@ function renderLotteryCard(p){
     quotaHtml = `<div class="lottery-quota">剩余名额：<b style="color:var(--pink-500)">${remain}</b> / ${maxEntries} 人${remain <= 0 ? '（已抽完）' : ''}</div>`;
   }
 
-  // ===== 参与者名单（仅 楼主/站长/管理员 可见；进行中可剔除/禁止，开奖后只读） =====
+  // ===== 参与者名单（仅 发帖人/站长 可见；进行中可剔除/禁止，开奖后只读） =====
   let participantHtml = '';
   if(isLtManager){
     // 已参与人员
@@ -3450,7 +3450,7 @@ function renderLotteryCard(p){
       </div>`;
   }
 
-  // ===== 奖品分配明细（仅 楼主/站长/管理员 可见；展示每个奖品已抽走/剩余，虚拟奖品列出已分配/未分配兑换码） =====
+  // ===== 奖品分配明细（仅 发帖人/站长 可见；展示每个奖品已抽走/剩余，虚拟奖品列出已分配/未分配兑换码） =====
   let prizeStatusHtml = '';
   if(isLtManager && Array.isArray(currentLotteryPrizeStatus) && currentLotteryPrizeStatus.length){
     const psRows = currentLotteryPrizeStatus.map(ps => {
@@ -3604,7 +3604,7 @@ async function claimMyLottery(){
   await refreshLotteryData();
   renderForumPost();
 }
-// 修改抽奖截止时间（仅 楼主/站长/管理员，进行中可改）
+// 修改抽奖截止时间（仅 发帖人/站长，进行中可改）
 async function editLotteryDeadline(){
   if(!currentUser || !currentForumPost || !currentLottery) return;
   const isInstant = currentLottery.draw_mode === 'instant';
@@ -3646,7 +3646,7 @@ function toggleLotteryPrizeStatus(){
   const box = document.getElementById('lotteryPrizeStatusBox');
   if(box) box.style.display = box.style.display === 'none' ? '' : 'none';
 }
-// 剔除 / 禁止 / 解禁 参与者（仅 楼主/站长/管理员）
+// 剔除 / 禁止 / 解禁 参与者（仅 发帖人/站长）
 async function manageLotteryEntry(targetUserId, action, targetName){
   if(!currentUser || !currentForumPost) return;
   const textMap = {
