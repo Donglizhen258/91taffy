@@ -2000,9 +2000,22 @@ function isTemporaryEmail(email){
   return blacklist.includes(domain.toLowerCase());
 }
 // 英文报错 -> 中文提示映射（Supabase/Gotrue 常见错误）
+// 限流解锁时间说明：Supabase 邮件/OTP 限流按项目维度累计（滑动窗口），
+// 无 Retry-After 头、官方未公开精确解锁时刻；"1 小时后"是保守保证值
+// （窗口必然滑过），实际可能更早解锁，故文案用「预计约」表意而非声称精确
+function plusHourTime(){
+  const d = new Date(Date.now() + 3600000);
+  const hh = String(d.getHours()).padStart(2,'0');
+  const mm = String(d.getMinutes()).padStart(2,'0');
+  return hh + ':' + mm;
+}
 function zhErr(msg){
   if(!msg) return '操作失败，请稍后再试喵';
   const m = String(msg);
+  // 邮件发送限流：提示保守的一小时后（附预计时刻），用「约」避免误导为精确解封时间
+  if(/over_email_send_rate_limit|email rate limit|too many email|over email send|email_send_rate/i.test(m)){
+    return '本站邮件已达每小时发送上限，预计约一小时后（' + plusHourTime() + '）可重试喵';
+  }
   const map = [
     [/invalid login credentials|Invalid login credentials/i, '邮箱或密码不正确喵'],
     [/Email not confirmed|email not confirmed/i, '请先到邮箱点击验证链接后再登录喵'],
@@ -2010,7 +2023,6 @@ function zhErr(msg){
     [/already been registered|already registered|User already registered|Email already exists/i, '该邮箱已被注册，请直接登录喵'],
     [/password.*(too short|should be at least)|at least \d+ characters|Password should be/i, '密码太短啦，至少需要6位喵'],
     [/user already exists|User already exists/i, '该用户已存在，请直接登录喵'],
-    [/over_email_send_rate_limit|email rate limit|too many email|over email send/i, '验证邮件发送太频繁啦，请稍后再试喵'],
     [/for security purposes|once every \d+ seconds/i, '操作太频繁啦，请稍后再试喵'],
     [/rate limit|too many requests|Requests rate limit/i, '操作太频繁啦，请稍后再试喵'],
     [/network|fetch failed|Failed to fetch|load failed|timeout|timed out|ECONNRESET|ERR_CONNECTION/i, '网络连接失败，请检查网络后重试喵'],
