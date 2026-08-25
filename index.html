@@ -46,7 +46,7 @@ body{
   background:linear-gradient(160deg,#ffe3f0 0%,#ffc9dd 45%,#ffb3d1 100%);
   min-height:100vh; color:var(--ink-900);
 }
-.wrap{max-width:880px;margin:0 auto;padding:24px 16px 60px}
+.wrap{max-width:1080px;margin:0 auto;padding:28px 20px 60px}
 /* Win7 Aero 立体玻璃：渐变高光 + 柔和投影 + 半透明磨砂 + 小圆角 */
 .card{
   background:linear-gradient(180deg,#ffffff 0%,#fff5f8 55%,#ffeef4 100%);
@@ -58,12 +58,12 @@ body{
     0 1px 2px rgba(178,58,99,.18),
     0 6px 16px rgba(178,58,99,.22),
     0 16px 40px rgba(178,58,99,.16);
-  padding:28px 26px;margin-bottom:20px;
+  padding:32px 30px;margin-bottom:20px;
 }
-.hero{text-align:center;padding:32px 20px 24px}
-.paw{width:120px;height:120px;margin:0 auto 16px;filter:drop-shadow(0 4px 10px rgba(178,58,99,.35))}
+.hero{text-align:center;padding:40px 24px 28px}
+.paw{width:132px;height:132px;margin:0 auto 18px;filter:drop-shadow(0 4px 10px rgba(178,58,99,.35))}
 .paw img{width:100%;height:100%;object-fit:contain}
-h1{font-size:38px;font-weight:800;letter-spacing:2px;
+h1{font-size:46px;font-weight:800;letter-spacing:2px;
   background:linear-gradient(180deg,#f26aa0 0%,#d4537e 40%,#a02b52 100%);
   -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
   text-shadow:0 1px 0 rgba(255,255,255,.6)}
@@ -429,6 +429,21 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
 .footer{text-align:center;font-size:12px;color:rgba(142,45,79,.65);padding:20px;text-shadow:0 1px 0 rgba(255,255,255,.5)}
 @media(max-width:480px){h1{font-size:30px}.card{padding:20px 16px}}
 
+/* ===== 强制视图模式（电脑版/移动版切换） ===== */
+/* 默认 auto：响应式随设备宽度自适应 */
+/* 强制电脑版：即使手机也显示宽屏布局 */
+html[data-mode="pc"] .wrap{max-width:1080px;padding:28px 20px 60px}
+html[data-mode="pc"] .card{padding:32px 30px}
+html[data-mode="pc"] h1{font-size:46px}
+html[data-mode="pc"] .paw{width:132px;height:132px}
+html[data-mode="pc"] .hero{padding:40px 24px 28px}
+/* 强制移动版：即使电脑也显示窄屏布局（用媒体查询的窄版样式） */
+html[data-mode="mobile"] .wrap{max-width:880px;padding:20px 12px 50px}
+html[data-mode="mobile"] .card{padding:18px 14px}
+html[data-mode="mobile"] h1{font-size:30px}
+html[data-mode="mobile"] .paw{width:100px;height:100px}
+html[data-mode="mobile"] .hero{padding:22px 14px 16px}
+
 /* ===== 左上角导航菜单（Win7 立体方框） ===== */
 .nav-btn{
   position:fixed;top:14px;left:14px;z-index:60;width:44px;height:44px;cursor:pointer;
@@ -484,6 +499,7 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
   position:relative;width:100%;height:280px;overflow:hidden;border-radius:6px;cursor:move;
   background:repeating-conic-gradient(#f3e3ea 0% 25%,#fff 0% 50%) 50%/20px 20px;
   border:1px solid rgba(178,58,99,.4);touch-action:none}
+@media (max-width:480px){.crop-box{height:300px}}
 .crop-box img{position:absolute;left:0;top:0;user-select:none;-webkit-user-drag:none;pointer-events:none;will-change:transform}
 .crop-mask{position:absolute;inset:0;pointer-events:none;display:flex;align-items:center;justify-content:center}
 .crop-mask::before{
@@ -511,6 +527,9 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
   </div>
   <div class="nav-item" id="navAdmin" style="display:none" onclick="goRoute('admin')">
     <span class="nav-ico">⚙️</span>网站管理
+  </div>
+  <div class="nav-item" id="navModeSwitch" onclick="cycleViewMode(); toggleNav();" title="切换电脑版 / 移动版布局">
+    <span class="nav-ico" id="navModeIco">🖥️</span><span id="navModeText">电脑版</span>
   </div>
 </div>
 <div class="wrap">
@@ -696,7 +715,10 @@ h1{font-size:38px;font-weight:800;letter-spacing:2px;
       </div>
       <div class="crop-tip">拖动图片调整位置，滚轮或按钮缩放，选好方形区域后点「确定」喵</div>
       <div class="crop-box" id="cropBox"
-        onmousedown="startCropDrag(event)"
+        onpointerdown="startCropDrag(event)"
+        onpointermove="onCropDrag(event)"
+        onpointerup="endCropDrag(event)"
+        onpointercancel="endCropDrag(event)"
         onwheel="onCropWheel(event)">
         <img id="cropImg" alt="裁剪预览" style="position:absolute;left:0;top:0;user-select:none;-webkit-user-drag:none;pointer-events:none">
         <div class="crop-mask"></div>
@@ -1082,6 +1104,58 @@ function toggleNav(){
   document.getElementById('navMenu').classList.toggle('show');
 }
 
+// ========== 电脑版 / 移动版 视图模式切换 ==========
+// 目标：
+//   - auto   ：跟随设备宽度自适应（默认，手机窄屏布局 / 电脑宽屏布局）
+//   - pc     ：强制电脑版（桌面宽布局，即使手机也显示完整宽版）
+//   - mobile ：强制移动版（窄屏布局，即使电脑也显示窄版）
+// 实现：localStorage 记住选择，给 <html> 加 data-mode 类，CSS 用
+//       html[data-mode="pc"] / html[data-mode="mobile"] 强制覆盖布局，
+//       不碰 viewport（避免 iOS Safari 对动态 viewport 的支持问题）
+const VIEW_MODE_KEY = '91taffy_view_mode';
+let viewMode = 'auto';
+function getDeviceMode(){
+  return (window.innerWidth <= 880) ? 'mobile' : 'pc';
+}
+function applyViewMode(){
+  const root = document.documentElement;
+  root.removeAttribute('data-mode');
+  if(viewMode === 'pc' || viewMode === 'mobile') root.setAttribute('data-mode', viewMode);
+  renderViewModeBtn();
+}
+function renderViewModeBtn(){
+  const ico = document.getElementById('navModeIco');
+  const txt = document.getElementById('navModeText');
+  if(!ico || !txt) return;
+  if(viewMode === 'auto'){
+    ico.textContent = getDeviceMode() === 'mobile' ? '📱' : '🖥️';
+    txt.textContent = getDeviceMode() === 'mobile' ? '切换电脑版' : '切换移动版';
+  } else if(viewMode === 'pc'){
+    ico.textContent = '🖥️'; txt.textContent = '切换移动版';
+  } else {
+    ico.textContent = '📱'; txt.textContent = '切换电脑版';
+  }
+}
+function cycleViewMode(){
+  const next = (viewMode === 'auto') ? (getDeviceMode() === 'mobile' ? 'pc' : 'mobile') : 'auto';
+  viewMode = next;
+  try{ localStorage.setItem(VIEW_MODE_KEY, viewMode); }catch(_){}
+  applyViewMode();
+  // 切换后立即重渲染当前视图（网格/卡片布局随断点变化）
+  if(currentRoute){
+    switchView(currentRoute === 'forumPost' ? 'forumPost' : currentRoute);
+  }
+}
+// 页面加载时立即应用已保存的模式（放在 init 之前，避免闪烁）；并随窗口尺寸变化刷新按钮文案
+(function initViewMode(){
+  try{
+    const saved = localStorage.getItem(VIEW_MODE_KEY);
+    if(saved === 'pc' || saved === 'mobile') viewMode = saved;
+  }catch(_){}
+  applyViewMode();
+})();
+window.addEventListener('resize', () => { if(viewMode === 'auto') renderViewModeBtn(); });
+
 // ================== 站内 hash 路由 ==================
 // 目标：浏览器后退/前进键按站内层级回退（首页→论坛→帖子→后退回论坛），而不是直接退出网站
 // hash 格式：#/home  #/forum  #/forum/post/<帖子id>  #/profile/<用户id>  #/account  #/admin
@@ -1365,14 +1439,14 @@ function renderCrop(){
   img.style.transform = `translate(${s.offX}px,${s.offY}px)`;
   img.style.left = '0'; img.style.top = '0';
 }
-// 拖动图片
+// 拖动图片（Pointer Events：鼠标 / 触屏 / 触控笔通用）
 let cropDrag = null;
 function startCropDrag(e){
   if(!cropState) return;
   e.preventDefault();
+  // 指针捕获：触屏上手指移出裁剪框仍能持续拖动，松手时统一结束
+  try{ e.currentTarget.setPointerCapture(e.pointerId); }catch(_){}
   cropDrag = { startX: e.clientX, startY: e.clientY, offX: cropState.offX, offY: cropState.offY };
-  document.addEventListener('mousemove', onCropDrag);
-  document.addEventListener('mouseup', endCropDrag);
 }
 function onCropDrag(e){
   if(!cropDrag || !cropState) return;
@@ -1380,10 +1454,11 @@ function onCropDrag(e){
   cropState.offY = cropDrag.offY + (e.clientY - cropDrag.startY);
   renderCrop();
 }
-function endCropDrag(){
+function endCropDrag(e){
+  if(!cropDrag) return;
   cropDrag = null;
-  document.removeEventListener('mousemove', onCropDrag);
-  document.removeEventListener('mouseup', endCropDrag);
+  // 释放指针捕获，避免后续 pointerdown 被吞
+  try{ if(e && e.currentTarget && e.currentTarget.hasPointerCapture && e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId); }catch(_){}
 }
 // 缩放（保持图片中心不动）
 function cropZoom(delta){
