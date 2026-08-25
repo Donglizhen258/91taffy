@@ -403,6 +403,11 @@ h1{font-size:46px;font-weight:800;letter-spacing:2px;
 .admin-toolbar .search-input{flex:1;min-width:180px;padding:7px 12px;font-size:13px;border:1px solid rgba(178,58,99,.4);border-radius:6px;background:var(--bg);color:var(--ink-700);outline:none}
 .admin-toolbar .search-input:focus{border-color:var(--pink-500);box-shadow:0 0 0 2px rgba(212,83,126,.2)}
 .admin-toolbar .search-input::placeholder{color:var(--ink-400)}
+/* 检索模式按钮组（搜UID / 搜邮箱 / 搜名称） */
+.admin-search-mode{display:flex;gap:4px;flex-shrink:0}
+.admin-search-mode .mode-btn{padding:5px 12px;font-size:12px;border:1px solid rgba(178,58,99,.4);border-radius:6px;background:var(--bg);color:var(--ink-600);cursor:pointer;transition:.12s}
+.admin-search-mode .mode-btn:hover{border-color:var(--pink-400);color:var(--pink-500)}
+.admin-search-mode .mode-btn.active{background:linear-gradient(180deg,#fdb1cc,#d4537e);color:#fff;font-weight:600;border-color:rgba(178,58,99,.55);box-shadow:inset 0 1px 0 rgba(255,255,255,.35)}
 .admin-count{font-size:12px;color:var(--ink-400);margin-left:auto;white-space:nowrap}
 .user-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
 .user-row .u-name{font-weight:600;font-size:14px}
@@ -740,7 +745,12 @@ html[data-mode="mobile"] .hero{padding:22px 14px 16px}
       <div class="admin-panel" id="adminPanel" style="display:none">
         <h3 id="adminTitle">管理面板</h3>
         <div class="admin-toolbar">
-          <input id="adminSearchInput" class="search-input" type="text" placeholder="按 UID 或账户名 / 昵称 / 邮箱检索，回车确认" oninput="adminSearchChanged(this.value)">
+          <div class="admin-search-mode" id="adminSearchMode">
+            <button class="btn btn-small mode-btn active" data-mode="uid" onclick="setAdminSearchMode('uid')">搜UID</button>
+            <button class="btn btn-small mode-btn" data-mode="email" onclick="setAdminSearchMode('email')">搜邮箱</button>
+            <button class="btn btn-small mode-btn" data-mode="name" onclick="setAdminSearchMode('name')">搜名称</button>
+          </div>
+          <input id="adminSearchInput" class="search-input" type="text" placeholder="按 UID 检索" oninput="adminSearchChanged(this.value)">
           <button class="btn btn-small" onclick="adminSearchClear()">清除</button>
           <span class="admin-count" id="adminUserCount"></span>
         </div>
@@ -3277,9 +3287,10 @@ async function unbanUser(){
 // ========== 管理面板（站长/管理员） ==========
 let adminDetailUser = null;
 let adminPanelPending = false;
-// 管理面板成员列表：全量缓存 + 检索 + 分页（10 个一页）
+// 管理面板成员列表：全量缓存 + 检索（按模式）+ 分页（10 个一页）
 let adminAllUsers = [];      // RPC 拉取的全量用户（含 auth 状态）
-let adminSearchText = '';    // 当前检索关键词（UID / 账户名 / 昵称 / 邮箱）
+let adminSearchText = '';    // 当前检索关键词
+let adminSearchMode = 'uid'; // 检索模式：uid 按UID / email 按邮箱 / name 按名称（昵称）
 let adminPage = 1;           // 当前页码
 const ADMIN_PAGE_SIZE = 10;  // 每页 10 个
 
@@ -3312,17 +3323,39 @@ async function renderAdminPanel(){
   }finally{ adminPanelPending = false; }
 }
 
-// 按当前检索关键词过滤用户（UID / 账户名 / 昵称 / 邮箱）
+// 按当前检索关键词过滤用户（按模式：uid / email / name）
 function adminFilterUsers(list, kw){
   kw = (kw == null ? adminSearchText : kw).trim().toLowerCase();
   if(!kw) return list || adminAllUsers;
-  return (list || adminAllUsers).filter(u => {
-    const uidMatch = u.uid != null && String(u.uid).toLowerCase().includes(kw);
-    const nameMatch = (u.nickname||'').toLowerCase().includes(kw);
-    const userMatch = (u.username||'').toLowerCase().includes(kw);
-    const emailMatch = (u.email||'').toLowerCase().includes(kw);
-    return uidMatch || nameMatch || userMatch || emailMatch;
+  const users = list || adminAllUsers;
+  return users.filter(u => {
+    if(adminSearchMode === 'uid'){
+      // UID 精确匹配（uid 是整数，用户输入什么就精确对什么）
+      return u.uid != null && String(u.uid).toLowerCase() === kw;
+    }
+    if(adminSearchMode === 'email'){
+      return (u.email||'').toLowerCase().includes(kw);
+    }
+    // name 模式：昵称或账户名（注册时二者同值，兜底兼容历史数据）
+    return (u.nickname||'').toLowerCase().includes(kw)
+        || (u.username||'').toLowerCase().includes(kw);
   });
+}
+
+// 切换检索模式（搜UID / 搜邮箱 / 搜名称）
+function setAdminSearchMode(mode){
+  adminSearchMode = mode;
+  // 高亮当前模式按钮
+  document.querySelectorAll('#adminSearchMode .mode-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.mode === mode);
+  });
+  // 更新搜索框占位提示 + 清空关键词重查
+  const ph = { uid:'按 UID 检索', email:'按邮箱检索', name:'按昵称 / 名称检索' }[mode] || '检索';
+  const input = document.getElementById('adminSearchInput');
+  if(input){ input.placeholder = ph; }
+  adminSearchText = '';
+  adminPage = 1;
+  renderAdminUserRows();
 }
 
 // 渲染当前页成员行（按检索过滤 + 分页）
